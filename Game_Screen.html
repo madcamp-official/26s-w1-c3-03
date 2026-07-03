@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Average RGB Guess</title>
+  <link rel="stylesheet" href="rgb_average_guess_ui.css" />
+</head>
+<body>
+  <main class="app">
+    <!-- Hidden dynamic title: kept for accessibility and for the script's current-screen state. -->
+    <h1 class="screen-title" id="screenTitle">My turn (Guessing)</h1>
+
+    <!-- Centered game board. The layout follows the wireframe: players left, image/inputs center, guide right. -->
+    <section class="game-board" aria-label="Average RGB game screen">
+      <!-- Placeholder exit button. The click handler is ready for later navigation/game-leave logic. -->
+      <button class="exit-button" id="exitButton" type="button" aria-label="Exit">
+        <img class="exit-icon" src="exit-icon.jpg" alt="" />
+      </button>
+
+      <!-- Left side: round number, countdown timer, and current player list. -->
+      <aside class="sidebar">
+        <h2 class="round-label" id="roundLabel">Round 1</h2>
+        <div class="timer" aria-live="polite">
+          <div class="timer-inner">
+            <span class="timer-number" id="timerNumber">30</span>
+            <span class="timer-caption" id="timerCaption">Time Left</span>
+          </div>
+        </div>
+        <div class="players" id="playersList"></div>
+      </aside>
+
+      <!-- Center: target image and the RGB guessing/result boxes. -->
+      <section class="play-area">
+        <!-- Temporary target image: one randomly generated solid color. -->
+        <div class="image-stage" id="targetImage" role="img" aria-label="Color to guess"></div>
+
+        <div class="rgb-controls" id="rgbControls"></div>
+        <p class="status-line" id="statusLine" aria-live="polite"></p>
+      </section>
+
+      <!-- Right side: guide popup trigger and always-visible error color mapping. -->
+      <aside class="right-rail">
+        <button class="guide-button" id="guideButton" type="button">Guide</button>
+        <div class="legend" aria-label="Error color guide">
+          <div class="legend-row"><span>Error = 0</span><span class="legend-dot dot-blue"></span></div>
+          <div class="legend-row"><span>Error &lt;= 10</span><span class="legend-dot dot-green"></span></div>
+          <div class="legend-row"><span>Error &lt;= 50</span><span class="legend-dot dot-yellow"></span></div>
+          <div class="legend-row"><span>Error &lt;= 150</span><span class="legend-dot dot-orange"></span></div>
+          <div class="legend-row"><span>Error &lt;= 255</span><span class="legend-dot dot-red"></span></div>
+        </div>
+      </aside>
+
+      <!-- Guide popup with a small RGB Venn diagram. -->
+      <div class="guide-popover" id="guidePopover" hidden>
+        <button class="popup-close" id="closeGuide" type="button" aria-label="Close guide">x</button>
+        <img class="guide-image" src="RGB.webp" alt="RGB guide" />
+      </div>
+
+      <!-- Modal used when the local player is watching another player reveal one color channel. -->
+      <div class="choice-layer" id="choiceLayer" hidden>
+        <div class="choice-card" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+          <button class="choice-close" id="closeChoice" type="button" aria-label="Close chooser">x</button>
+          <h3 class="choice-title" id="choiceTitle">Choose one</h3>
+          <div class="choice-buttons" id="choiceButtons"></div>
+        </div>
+      </div>
+
+      <!-- Final answer popup shown after all rounds are complete. -->
+      <div class="final-layer" id="finalLayer" hidden>
+        <div class="final-modal" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
+          <h3 class="final-title" id="finalTitle">Final Guess</h3>
+          <div class="final-target-image" id="finalTargetImage" role="img" aria-label="Color to guess"></div>
+          <div class="final-inputs" aria-label="Final RGB answer with final boundaries">
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="r">255</div>
+              <div class="chevron" aria-hidden="true">&le;</div>
+              <div class="value-entry">
+                <input class="value-box is-red" id="final-r" data-final-channel="r" type="number" inputmode="numeric" min="1" max="255" aria-label="Final R value" />
+                <span class="value-label" aria-hidden="true">R</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">&le;</div>
+              <div class="bound" data-final-bound-low="r">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="g">255</div>
+              <div class="chevron" aria-hidden="true">&le;</div>
+              <div class="value-entry">
+                <input class="value-box is-green" id="final-g" data-final-channel="g" type="number" inputmode="numeric" min="1" max="255" aria-label="Final G value" />
+                <span class="value-label" aria-hidden="true">G</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">&le;</div>
+              <div class="bound" data-final-bound-low="g">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="b">255</div>
+              <div class="chevron" aria-hidden="true">&le;</div>
+              <div class="value-entry">
+                <input class="value-box is-blue" id="final-b" data-final-channel="b" type="number" inputmode="numeric" min="1" max="255" aria-label="Final B value" />
+                <span class="value-label" aria-hidden="true">B</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">&le;</div>
+              <div class="bound" data-final-bound-low="b">0</div>
+            </div>
+          </div>
+          <button class="final-submit-button" id="submitFinalButton" type="button">Submit</button>
+          <p class="final-status" id="finalStatus" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <!-- Result popup shown after the final answer is submitted. -->
+      <div class="result-layer" id="resultLayer" hidden>
+        <div class="result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+          <h3 class="result-title" id="resultTitle">Game Result</h3>
+          <div class="result-text" id="resultText" aria-live="polite"></div>
+          <button class="result-button" id="closeResult" type="button">Close</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="rgb_average_guess_ui.js"></script>
+</body>
+</html>
