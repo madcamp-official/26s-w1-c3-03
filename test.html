@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>컬러마스터 시뮬레이터</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2>🎮 컬러마스터 백엔드 시뮬레이터</h2>
+  
+  <div style="margin-bottom: 20px;">
+    <h3>🎯 맞혀야 할 단일 이미지</h3>
+    <div id="image-box" style="width: 250px; height: 150px; background: #eee; border: 2px solid #333; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">
+      (게임 시작 시 이미지가 나옵니다)
+    </div>
+  </div>
+  
+  <div style="display: flex; flex-direction: column; gap: 15px; max-width: 450px;">
+    <button onclick="joinRoom()" style="padding: 10px;">1. 방 입장 (공통)</button>
+    
+    <!-- 1번 수정: 게임 시작 전 난이도 조절 -->
+    <div style="background: #e0f7fa; padding: 10px; border-radius: 5px; display: flex; align-items: center; justify-content: space-between;">
+      <label>난이도 선택: 
+        <select id="gameLevel">
+          <option value="1" selected>1 (기본)</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4 (최고)</option>
+        </select>
+      </label>
+      <button onclick="startGame()" style="padding: 5px 10px;">2. 게임 시작 (방장 전용)</button>
+    </div>
+    
+    <!-- 2번 수정: 동적으로 범위가 조여지는 입력창 -->
+    <div style="background: #fff9c4; padding: 10px; border-radius: 5px;">
+      <p style="margin-top: 0; font-weight: bold; font-size: 14px;">현재 입력 가능 범위</p>
+      <div style="margin-bottom: 5px;">
+        <label>R <span id="rangeR" style="color:#666; font-size:12px;">(0~255)</span> : 
+          <input type="number" id="valR" value="100" style="width:60px;">
+        </label>
+      </div>
+      <div style="margin-bottom: 5px;">
+        <label>G <span id="rangeG" style="color:#666; font-size:12px;">(0~255)</span> : 
+          <input type="number" id="valG" value="100" style="width:60px;">
+        </label>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <label>B <span id="rangeB" style="color:#666; font-size:12px;">(0~255)</span> : 
+          <input type="number" id="valB" value="100" style="width:60px;">
+        </label>
+      </div>
+      <button onclick="submitGuess()" style="padding: 5px 10px; width: 100%;">3. 정답 제출 (내 턴)</button>
+    </div>
+
+    <div style="background: #fce4ec; padding: 10px; border-radius: 5px;">
+      <select id="peekTarget" style="padding: 5px;">
+        <option value="R">Red (R)</option>
+        <option value="G">Green (G)</option>
+        <option value="B">Blue (B)</option>
+      </select>
+      <button onclick="peekColor()" style="padding: 5px 10px; margin-left: 10px;">4. 훔쳐보기 (남의 턴)</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io('http://localhost:3000');
+    const roomCode = 'ROOM_777'; 
+    const myNickname = '유저_' + Math.floor(Math.random() * 1000); 
+    const myUserId = 'uid_' + myNickname;
+
+    // 2번 수정: 각 채널의 현재 허용 범위를 기억하는 상태 변수
+    let currentBounds = {
+      R: { min: 0, max: 255 },
+      G: { min: 0, max: 255 },
+      B: { min: 0, max: 255 }
+    };
+
+    socket.on('connect', () => {
+      console.log('✅ 서버 연결 성공! 내 닉네임:', myNickname);
+    });
+
+    socket.on('round_start', (data) => {
+      const imageBox = document.getElementById('image-box');
+      imageBox.innerHTML = `Round ${data.round}`;
+      imageBox.style.color = '#fff';
+      imageBox.style.fontWeight = 'bold';
+      imageBox.style.textShadow = '1px 1px 2px #000';
+
+      const pct = 100 / data.colors.length;
+      const gradientStops = data.colors.map((c, i) => {
+        const rgb = `rgb(${c.r}, ${c.g}, ${c.b})`;
+        return `${rgb} ${i * pct}%, ${rgb} ${(i + 1) * pct}%`;
+      });
+      imageBox.style.background = `linear-gradient(to right, ${gradientStops.join(', ')})`;
+
+      // 1라운드 시작 시에만 범위를 0~255로 완전 초기화
+      if (data.round === 1) {
+        currentBounds = { R: {min:0, max:255}, G: {min:0, max:255}, B: {min:0, max:255} };
+        updateBoundsUI();
+      }
+    });
+
+    socket.on('turn_start', (data) => {
+      if(data.turnUserId === myUserId) {
+        alert(`당신의 턴입니다! (제한시간 30초)\n좁혀진 범위에 맞춰 숫자를 입력하세요.`);
+      }
+    });
+
+    // 내 제출 결과를 받고 범위 축소
+    socket.on('my_guess_result', (data) => {
+      alert(`✅ [내 제출 결과]\n제출한 값: R(${data.guessRGB.r}), G(${data.guessRGB.g}), B(${data.guessRGB.b})\n결과 색상: R(${data.feedback.R}), G(${data.feedback.G}), B(${data.feedback.B})`);
+      
+      applyFeedbackToBounds('R', data.guessRGB.r, data.feedback.R);
+      applyFeedbackToBounds('G', data.guessRGB.g, data.feedback.G);
+      applyFeedbackToBounds('B', data.guessRGB.b, data.feedback.B);
+    });
+
+    // 훔쳐보기 결과를 받고 해당 채널 범위 축소
+    socket.on('peek_result', (data) => {
+      alert(`👀 [훔쳐보기 결과]\n선택한 색상: ${data.selectedColor}\n제출된 숫자: ${data.guessValue}\n결과 색상: ${data.resultColor}`);
+      applyFeedbackToBounds(data.selectedColor, data.guessValue, data.resultColor);
+    });
+
+    socket.on('game_over', (data) => {
+      let resultText = "🏆 [게임 종료! 최종 순위] 🏆\n\n";
+      data.results.forEach(res => {
+        resultText += `${res.rank}위: ${res.nickname}\n - 마지막 라운드 오차합: ${res.finalError}\n - 획득 포인트: ${res.earnedPoint}점\n\n`;
+      });
+      alert(resultText);
+    });
+
+    function joinRoom() { socket.emit('join_room', { roomCode, userId: myUserId, nickname: myNickname }); }
+    
+    function startGame() { 
+      const level = parseInt(document.getElementById('gameLevel').value);
+      socket.emit('start_game', { roomCode, level: level }); 
+    }
+    
+    function submitGuess() {
+      const r = parseInt(document.getElementById('valR').value);
+      const g = parseInt(document.getElementById('valG').value);
+      const b = parseInt(document.getElementById('valB').value);
+      
+      // 2번 수정: 입력값이 현재 허용된 범위를 벗어났는지 강력하게 검사
+      if (r < currentBounds.R.min || r > currentBounds.R.max ||
+          g < currentBounds.G.min || g > currentBounds.G.max ||
+          b < currentBounds.B.min || b > currentBounds.B.max) {
+        alert("⚠️ 경고: 제한된 범위를 벗어난 숫자가 있습니다!\nUI에 표시된 (최소~최대) 범위 안에서만 입력해주세요.");
+        return;
+      }
+      
+      socket.emit('submit_guess', { roomCode, guessRGB: { r, g, b } });
+    }
+
+    function peekColor() {
+      const selected = document.getElementById('peekTarget').value;
+      socket.emit('peek_color', { roomCode, selectedColor: selected });
+    }
+
+    // --- 범위 축소 및 UI 업데이트 핵심 로직 ---
+    function applyFeedbackToBounds(channel, guessValue, feedbackColor) {
+      let errorMargin = 255;
+      if (feedbackColor === '파란색') errorMargin = 0;
+      else if (feedbackColor === '초록색') errorMargin = 10;
+      else if (feedbackColor === '노란색') errorMargin = 50;
+      else if (feedbackColor === '주황색') errorMargin = 150;
+      
+      // 새로운 단서로 알게 된 최소/최대값 (0~255 사이로 제한)
+      const newMin = Math.max(0, guessValue - errorMargin);
+      const newMax = Math.min(255, guessValue + errorMargin);
+
+      // 기존의 범위와 새로운 범위를 비교하여 '더 좁은 교집합'으로 업데이트
+      currentBounds[channel].min = Math.max(currentBounds[channel].min, newMin);
+      currentBounds[channel].max = Math.min(currentBounds[channel].max, newMax);
+
+      updateBoundsUI();
+    }
+
+    function updateBoundsUI() {
+      ['R', 'G', 'B'].forEach(ch => {
+        document.getElementById(`range${ch}`).innerText = `(${currentBounds[ch].min}~${currentBounds[ch].max})`;
+        // input 태그의 html 속성도 업데이트하여 화살표 조작 제한
+        document.getElementById(`val${ch}`).min = currentBounds[ch].min;
+        document.getElementById(`val${ch}`).max = currentBounds[ch].max;
+      });
+    }
+  </script>
+</body>
+</html>
