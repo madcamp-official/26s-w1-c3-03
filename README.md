@@ -51,6 +51,8 @@
 
 <img width="1404" height="1149" alt="Image" src="https://github.com/user-attachments/assets/f5aca856-eb16-4f4a-b5c3-0b438ca0f746" />
 
+<img width="1455" height="745" alt="Image" src="https://github.com/user-attachments/assets/b94aa486-65c6-4b93-9ad0-1a1802c64cf6" />
+
 ---
 
 ## DB 스키마
