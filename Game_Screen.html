@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Average RGB Guess</title>
-  <link rel="stylesheet" href="rgb_average_guess_ui.css" />
+  <link rel="stylesheet" href="Game_Screen.css" />
 </head>
 <body>
   <main class="app">
@@ -76,7 +76,7 @@
               <div class="bound" data-final-bound-high="r">255</div>
               <div class="chevron" aria-hidden="true">&le;</div>
               <div class="value-entry">
-                <input class="value-box is-red" id="final-r" data-final-channel="r" type="number" inputmode="numeric" min="1" max="255" aria-label="Final R value" />
+                <input class="value-box is-red" id="final-r" data-final-channel="r" type="number" inputmode="numeric" min="0" max="255" aria-label="Final R value" />
                 <span class="value-label" aria-hidden="true">R</span>
               </div>
               <div class="chevron up" aria-hidden="true">&le;</div>
@@ -86,7 +86,7 @@
               <div class="bound" data-final-bound-high="g">255</div>
               <div class="chevron" aria-hidden="true">&le;</div>
               <div class="value-entry">
-                <input class="value-box is-green" id="final-g" data-final-channel="g" type="number" inputmode="numeric" min="1" max="255" aria-label="Final G value" />
+                <input class="value-box is-green" id="final-g" data-final-channel="g" type="number" inputmode="numeric" min="0" max="255" aria-label="Final G value" />
                 <span class="value-label" aria-hidden="true">G</span>
               </div>
               <div class="chevron up" aria-hidden="true">&le;</div>
@@ -96,7 +96,7 @@
               <div class="bound" data-final-bound-high="b">255</div>
               <div class="chevron" aria-hidden="true">&le;</div>
               <div class="value-entry">
-                <input class="value-box is-blue" id="final-b" data-final-channel="b" type="number" inputmode="numeric" min="1" max="255" aria-label="Final B value" />
+                <input class="value-box is-blue" id="final-b" data-final-channel="b" type="number" inputmode="numeric" min="0" max="255" aria-label="Final B value" />
                 <span class="value-label" aria-hidden="true">B</span>
               </div>
               <div class="chevron up" aria-hidden="true">&le;</div>
@@ -118,6 +118,6 @@
       </div>
     </section>
   </main>
-  <script src="rgb_average_guess_ui.js"></script>
+  <script src="Game_Screen.js"></script>
 </body>
 </html>

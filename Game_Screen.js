@@ -41,7 +41,7 @@ const ERROR_LIMIT_BY_TIER = {
 
 /* Temporary single-color target. Later this can become a 1-5 color generator. */
 function randomRgbValue() {
-  return Math.floor(Math.random() * 255) + 1;
+  return Math.floor(Math.random() * 256);
 }
 
 function createSingleColorTarget() {
@@ -232,7 +232,7 @@ function renderChannels() {
     const box = editable
       ? `
         <div class="value-entry ${value ? "has-value" : ""}">
-          <input class="value-box ${meta.css}" id="${inputName}" data-channel="${channel}" type="number" inputmode="numeric" min="1" max="255" value="${value}" aria-label="${meta.label} value" />
+          <input class="value-box ${meta.css}" id="${inputName}" data-channel="${channel}" type="number" inputmode="numeric" min="0" max="255" value="${value}" aria-label="${meta.label} value" />
           <span class="value-label" aria-hidden="true">${meta.label}</span>
         </div>
       `
@@ -371,7 +371,12 @@ function readGuessFromInputs() {
   const guess = {};
   for (const channel of CHANNELS) {
     const input = document.getElementById(`guess-${channel}`);
-    const value = Number(input ? input.value : game.lastVisibleGuess[channel]);
+    const rawValue = input ? input.value.trim() : String(game.lastVisibleGuess[channel]).trim();
+    if (rawValue === "") {
+      return null;
+    }
+
+    const value = Number(rawValue);
     if (!Number.isInteger(value) || value < 0 || value > 255) {
       return null;
     }
@@ -380,23 +385,14 @@ function readGuessFromInputs() {
   return guess;
 }
 
-/* Auto-submit fallback if a local player runs out of time without valid input. */
-function midpointGuess() {
-  return CHANNELS.reduce((guess, channel) => {
-    const bounds = game.boundaries[channel];
-    guess[channel] = clamp(Math.round((bounds.low + bounds.high) / 2), 1, 255);
-    return guess;
-  }, {});
-}
-
 /* Mock guess generator for other players until real multiplayer data exists. */
 function mockGuessForCurrentPlayer() {
   const roundOffset = game.currentRound * 13;
   const playerOffset = activePlayer().id * 19;
   return {
-    r: clamp(92 + playerOffset + roundOffset, 1, 255),
-    g: clamp(205 - playerOffset + Math.round(roundOffset / 2), 1, 255),
-    b: clamp(71 + playerOffset - Math.round(roundOffset / 3), 1, 255)
+    r: clamp(92 + playerOffset + roundOffset, 0, 255),
+    g: clamp(205 - playerOffset + Math.round(roundOffset / 2), 0, 255),
+    b: clamp(71 + playerOffset - Math.round(roundOffset / 3), 0, 255)
   };
 }
 
@@ -422,11 +418,15 @@ function submitTurn(autoSubmit) {
   let guess;
   if (isLocalTurn()) {
     guess = readGuessFromInputs();
-    if (!guess && !autoSubmit) {
-      els.statusLine.textContent = "Enter numbers from 0 to 255.";
+    if (!guess) {
+      if (!autoSubmit) {
+        els.statusLine.textContent = "Enter numbers from 0 to 255.";
+        return;
+      }
+
+      advanceTurn();
       return;
     }
-    if (!guess) guess = midpointGuess();
     game.lastVisibleGuess = { ...guess };
   } else {
     guess = mockGuessForCurrentPlayer();
@@ -571,9 +571,10 @@ function submitFinalAnswer() {
   const answer = {};
   for (const channel of CHANNELS) {
     const input = document.getElementById(`final-${channel}`);
-    const value = Number(input ? input.value : game.finalAnswer[channel]);
-    if (!Number.isInteger(value) || value < 1 || value > 255) {
-      els.finalStatus.textContent = "Enter final numbers from 1 to 255.";
+    const rawValue = input ? input.value.trim() : String(game.finalAnswer[channel]).trim();
+    const value = Number(rawValue);
+    if (rawValue === "" || !Number.isInteger(value) || value < 0 || value > 255) {
+      els.finalStatus.textContent = "Enter final numbers from 0 to 255.";
       return;
     }
     answer[channel] = value;
