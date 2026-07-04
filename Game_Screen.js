@@ -558,28 +558,43 @@ function resetFinalInputs() {
 function startFinalAnswer() {
   clearAllTimers();
   game.phase = "final";
-  game.turnSeconds = 0;
+  game.turnSeconds = 30;
   game.finalAnswer = { r: "", g: "", b: "" };
   els.statusLine.textContent = "";
   els.finalStatus.textContent = "";
   resetFinalInputs();
   render();
+
+  turnTimer = setInterval(() => {
+    game.turnSeconds -= 1;
+    els.timerNumber.textContent = game.turnSeconds;
+    if (game.turnSeconds <= 0) {
+      submitFinalAnswer(true);
+    }
+  }, 1000);
 }
 
 /* Scores the final answer by subtracting total RGB error from the maximum possible score. */
-function submitFinalAnswer() {
+function submitFinalAnswer(autoSubmit = false) {
   const answer = {};
   for (const channel of CHANNELS) {
     const input = document.getElementById(`final-${channel}`);
     const rawValue = input ? input.value.trim() : String(game.finalAnswer[channel]).trim();
     const value = Number(rawValue);
     if (rawValue === "" || !Number.isInteger(value) || value < 0 || value > 255) {
+      if (autoSubmit) {
+        const bounds = game.boundaries[channel];
+        answer[channel] = clamp(Math.round((bounds.low + bounds.high) / 2), 0, 255);
+        continue;
+      }
+
       els.finalStatus.textContent = "Enter final numbers from 0 to 255.";
       return;
     }
     answer[channel] = value;
   }
 
+  clearAllTimers();
   const errors = errorsFor(answer);
   const totalError = CHANNELS.reduce((sum, channel) => sum + errors[channel], 0);
   game.finalAnswer = { ...answer };
@@ -631,5 +646,5 @@ els.exitButton.addEventListener("click", () => {
 });
 
 /* Initial screen load starts at round 1, player 1, guessing phase. */
-startTurn();
-// startFinalAnswer();
+// startTurn();
+startFinalAnswer();

@@ -390,6 +390,7 @@ input.value-box:focus {
   position: absolute;
   top: 222px;
   right: 0;
+  z-index: 36;
   width: 54px;
   height: 52px;
   background: var(--soft);
@@ -451,7 +452,7 @@ input.value-box:focus {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
-  z-index: 22;
+  z-index: 50;
 }
 
 .guide-image {
@@ -605,11 +606,12 @@ input.value-box:focus {
   display: grid;
   place-items: center;
   padding: 24px;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .final-modal,
 .result-modal {
+  pointer-events: auto;
   width: min(420px, calc(100% - 40px));
   /* height: 180px;s */
   padding: 34px 38px 30px;
