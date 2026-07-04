@@ -49,8 +49,8 @@
 
 > 서비스의 전체 페이지 구조와 페이지 간 이동 흐름; 각 페이지의 주요 UI 구성, 입력 요소, 버튼, 사용자 행동 흐름 등을 간단한 와이어프레임 형태로 정리
 
-### IA
-<img width="2228" height="1392" alt="Image" src="https://github.com/user-attachments/assets/200bdbc3-d67e-43ad-a013-aa5762587a5f" />
+### 플로우 차트
+<img width="2228" height="1392" alt="Image" src="https://github.com/user-attachments/assets/54f8a99a-94cb-4227-9250-49d2ca585e75" />
 
 ### 화면 설계서
 <img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/deb5d6e7-d90a-46b3-8e7a-96c261b5b9d6" />
