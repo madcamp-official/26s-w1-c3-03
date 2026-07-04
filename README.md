@@ -49,8 +49,8 @@
 
 > 서비스의 전체 페이지 구조와 페이지 간 이동 흐름; 각 페이지의 주요 UI 구성, 입력 요소, 버튼, 사용자 행동 흐름 등을 간단한 와이어프레임 형태로 정리
 
-플로우 차트
-<img width="1692" height="1261" alt="Image" src="https://github.com/user-attachments/assets/02f2e1cf-9c58-4b3f-bb68-68b9a157391a" />
+**플로우 차트**
+<img width="2228" height="1392" alt="Image" src="https://github.com/user-attachments/assets/200bdbc3-d67e-43ad-a013-aa5762587a5f" />
 
 <img width="1455" height="745" alt="Image" src="https://github.com/user-attachments/assets/b94aa486-65c6-4b93-9ad0-1a1802c64cf6" />
 
