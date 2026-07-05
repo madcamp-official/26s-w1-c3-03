@@ -22,7 +22,7 @@ const ERROR_LIMIT_BY_TIER = {
   orange: 150,
   red: 255
 };
-const PREVIEW_GAME_SCREEN = true;
+const PREVIEW_GAME_SCREEN = false;
 
 /* Socket.IO is loaded from /socket.io/socket.io.js by the HTML file. */
 const socket = typeof window.io === "function" ? window.io() : null;
@@ -64,7 +64,7 @@ const game = {
   },
   currentRound: 1,
   currentPlayerIndex: PREVIEW_GAME_SCREEN ? 0 : 0,
-  phase: PREVIEW_GAME_SCREEN ? "final" : "lobby",
+  phase: "lobby",
   turnSeconds: 30,
   choiceSeconds: 10,
   currentSubmission: null,
