@@ -633,9 +633,9 @@ button {
   min-height: 28px;
   display: grid;
   place-items: center;
-  color: var(--tier-green);
+  color: #ffffff;
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 400;
 }
 
 .play-area {
@@ -843,8 +843,8 @@ input.value-box:focus {
   align-self: center;
 }
 
-.submit-button:hover,
-.final-submit-button:hover,
+.submit-button:not(:disabled):hover,
+.final-submit-button:not(:disabled):hover,
 .result-button:hover,
 .guide-button:hover,
 .choice-button:hover {
@@ -852,7 +852,8 @@ input.value-box:focus {
   filter: brightness(1.06);
 }
 
-.submit-button:disabled {
+.submit-button:disabled,
+.final-submit-button:disabled {
   opacity: 0.35;
   cursor: default;
   filter: grayscale(0.5);
