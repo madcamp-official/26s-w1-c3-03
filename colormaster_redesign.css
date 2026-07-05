@@ -778,6 +778,7 @@ button {
   font-weight: 950;
   outline: 0;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
+  transform: translateY(-1px);
 }
 
 input.value-box {
@@ -801,11 +802,13 @@ input.value-box:focus {
   inset: 0;
   display: grid;
   place-items: center;
-  color: rgba(255,255,255,0.86);
-  font-size: 24px;
+  color: #ffffff;
+  font-size: 25px;
   font-weight: 950;
-  line-height: 1;
+  /* line-height: 1; */
+  line-height: var(--value-box-size);
   pointer-events: none;
+  /* transform: translateY(-1px); */
 }
 
 .value-entry.has-value .value-label {
