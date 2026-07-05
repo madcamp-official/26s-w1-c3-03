@@ -12,7 +12,7 @@ const CONFIG = {
   GUESS_TIME_MS: 30000,
   PEEK_TIME_MS: 10000,
   FINAL_TIME_MS: 30000,
-  MIN_PLAYERS_TO_START: 1,
+  MIN_PLAYERS_TO_START: 2,
   POINTS: {
     1: [5],
     2: [5, 3],
@@ -73,7 +73,7 @@ function errorsFor(target, guess) {
 }
 
 function generateTarget(level) {
-  const colorCount = clamp(Number(level) || 1, 1, 5);
+  const colorCount = clamp(Number(level) || 1, 1, 4);
   const colors = [];
   let totalR = 0;
   let totalG = 0;
@@ -159,7 +159,7 @@ function resetPlayerRoundState(room) {
 function startGame(room, level) {
   clearRoomTimer(room);
   room.phase = "PLAYING";
-  room.level = clamp(Number(level) || 1, 1, 5);
+  room.level = clamp(Number(level) || 1, 1, 4);
   room.round = 0;
   room.turnIndex = 0;
   room.targetData = generateTarget(room.level);

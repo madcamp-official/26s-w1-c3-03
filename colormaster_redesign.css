@@ -657,7 +657,7 @@ button {
   width: min(100%, 292px);
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  border-radius: 30px;
+  border-radius: 0;
   border: 1px solid rgba(255,255,255,0.24);
   background: #d6d6d6;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.18);
@@ -1243,7 +1243,7 @@ input.value-box:focus {
 
 .final-target-image {
   width: 170px;
-  border-radius: 28px;
+  border-radius: 0;
   transform: none;
 }
 

@@ -190,7 +190,7 @@ function renderLobby() {
   els.gameBoard.hidden = showLobby;
 
   const isHost = roomClient.hostUserId === game.localPlayerId;
-  els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 1;
+  els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 2;
 
   els.lobbyPlayersList.innerHTML = game.players.length
     ? game.players.map((player) => `
