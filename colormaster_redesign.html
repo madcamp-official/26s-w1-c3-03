@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color Master - Game Screen</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.min.css" />
+  <link rel="stylesheet" href="colormaster_redesign.css" />
+</head>
+<body>
+  <main class="app">
+    <h1 class="screen-title" id="screenTitle">내 턴 - RGB 추측</h1>
+
+    <!-- Lobby screen shown before the server starts a room game. -->
+    <section class="lobby-screen" id="lobbyScreen" aria-label="Color Master lobby">
+      <div class="lobby-card">
+        <p class="eyebrow">REAL-TIME RGB GUESS</p>
+        <h2 class="lobby-title">Color Master</h2>
+        <p class="lobby-status" id="lobbyStatus" aria-live="polite">Connect to the server, then join a room.</p>
+
+        <div class="lobby-form">
+          <label class="lobby-field">
+            <span>Room Code</span>
+            <input id="roomCodeInput" type="text" value="ROOM_777" autocomplete="off" />
+          </label>
+          <label class="lobby-field">
+            <span>Nickname</span>
+            <input id="nicknameInput" type="text" autocomplete="off" />
+          </label>
+          <label class="lobby-field">
+            <span>Image Colors</span>
+            <select id="levelSelect">
+              <option value="1">1 color</option>
+              <option value="2">2 colors</option>
+              <option value="3">3 colors</option>
+              <option value="4">4 colors</option>
+              <option value="5">5 colors</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="lobby-actions">
+          <button class="lobby-button" id="joinRoomButton" type="button">Join Room</button>
+          <button class="lobby-button" id="startGameButton" type="button" disabled>Start Game</button>
+        </div>
+
+        <section class="lobby-players" aria-label="Players waiting in room">
+          <div class="panel-heading">
+            <span>Players</span>
+            <small>Waiting room</small>
+          </div>
+          <div class="lobby-player-list" id="lobbyPlayersList"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Main game board. JavaScript shows this after the server starts the game. -->
+    <section class="game-board" id="gameBoard" aria-label="컬러마스터 플레이 화면" hidden>
+      <div class="ambient ambient-one" aria-hidden="true"></div>
+      <div class="ambient ambient-two" aria-hidden="true"></div>
+
+      <button class="exit-button" id="exitButton" type="button" aria-label="나가기">
+        <img class="exit-icon" src="exit_icon.png" alt="" />
+      </button>
+
+      <!-- Volume control placeholder: the slider UI is wired now; real audio control can be added later. -->
+      <div class="volume-control" id="volumeControl">
+        <div class="volume-slider-wrap" id="volumeSliderWrap" hidden>
+          <input class="volume-slider" id="volumeSlider" type="range" min="0" max="100" value="70" aria-label="Volume" />
+        </div>
+        <button class="volume-button" id="volumeButton" type="button" aria-label="볼륨 조절" aria-expanded="false">
+          <img class="volume-icon" src="volume_icon.png" alt="" />
+        </button>
+      </div>
+
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">REAL-TIME RGB GUESS</p>
+          <h2 class="game-title">Color Master</h2>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <div class="round-card">
+          <span class="round-caption">현재 라운드</span>
+          <h2 class="round-label" id="roundLabel">Round 1</h2>
+        </div>
+
+        <div class="timer" aria-live="polite">
+          <div class="timer-ring" aria-hidden="true"></div>
+          <div class="timer-inner">
+            <span class="timer-number" id="timerNumber">30</span>
+            <span class="timer-caption" id="timerCaption">TIME</span>
+          </div>
+        </div>
+
+        <section class="player-panel" aria-label="플레이어 목록">
+          <div class="panel-heading">
+            <span>Players</span>
+          </div>
+          <div class="players" id="playersList"></div>
+        </section>
+      </aside>
+
+      <section class="play-area">
+        <div class="target-card">
+          <div class="card-label">TARGET IMAGE</div>
+          <div class="image-stage" id="targetImage" role="img" aria-label="추측해야 할 평균 색상"></div>
+          <p class="target-helper">이미지의 평균 RGB 값을 추측하세요.</p>
+        </div>
+
+        <div class="guess-card">
+          <div class="guess-header">
+            <span>RGB Guess</span>
+            <small>0부터 255까지 입력</small>
+          </div>
+          <div class="rgb-controls" id="rgbControls"></div>
+          <p class="status-line" id="statusLine" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <aside class="right-rail">
+        <!-- The RGB map is always visible so players do not need to open a guide popup. -->
+        <section class="guide-card" aria-label="RGB 색상 가이드">
+          <div class="panel-heading">
+            <span>Color Guide</span>
+          </div>
+          <img class="guide-image" src="rgb_guide.png" alt="RGB 색상 가이드" />
+        </section>
+
+        <section class="legend-card" aria-label="오차 색상 가이드">
+          <div class="panel-heading">
+            <span>Error Guide</span>
+            <small>오차 범위</small>
+          </div>
+          <div class="legend">
+            <div class="legend-row"><span>Error = 0</span><span class="legend-dot dot-blue"></span></div>
+            <div class="legend-row"><span>Error ≤ 10</span><span class="legend-dot dot-green"></span></div>
+            <div class="legend-row"><span>Error ≤ 50</span><span class="legend-dot dot-yellow"></span></div>
+            <div class="legend-row"><span>Error ≤ 150</span><span class="legend-dot dot-orange"></span></div>
+            <div class="legend-row"><span>Error ≤ 255</span><span class="legend-dot dot-red"></span></div>
+          </div>
+        </section>
+      </aside>
+
+      <div class="choice-layer" id="choiceLayer" hidden>
+        <div class="choice-card" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+          <div class="choice-popup-timer" aria-live="polite">
+            <span class="choice-popup-time" id="choicePopupTime">10</span>
+            <span class="choice-popup-caption">TIME</span>
+          </div>
+          <button class="choice-close" id="closeChoice" type="button" aria-label="선택창 닫기">×</button>
+          <p class="modal-kicker">PEEK PHASE</p>
+          <h3 class="choice-title" id="choiceTitle">어떤 색을 볼까요?</h3>
+          <div class="choice-buttons" id="choiceButtons"></div>
+        </div>
+      </div>
+
+      <div class="final-layer" id="finalLayer" hidden>
+        <div class="final-modal" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
+          <div class="final-popup-timer" aria-live="polite">
+            <span class="final-popup-time" id="finalPopupTime">30</span>
+            <span class="final-popup-caption">TIME</span>
+          </div>
+          <p class="modal-kicker">FINAL GUESS</p>
+          <h3 class="final-title" id="finalTitle">최종 추측</h3>
+          <div class="final-target-image" id="finalTargetImage" role="img" aria-label="최종 추측 대상 색상"></div>
+          <div class="final-inputs" aria-label="최종 RGB 입력">
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="r">255</div>
+              <div class="chevron" aria-hidden="true">≤</div>
+              <div class="value-entry">
+                <input class="value-box is-red" id="final-r" data-final-channel="r" type="number" inputmode="numeric" min="0" max="255" aria-label="최종 R 값" />
+                <span class="value-label" aria-hidden="true">R</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">≤</div>
+              <div class="bound" data-final-bound-low="r">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="g">255</div>
+              <div class="chevron" aria-hidden="true">≤</div>
+              <div class="value-entry">
+                <input class="value-box is-green" id="final-g" data-final-channel="g" type="number" inputmode="numeric" min="0" max="255" aria-label="최종 G 값" />
+                <span class="value-label" aria-hidden="true">G</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">≤</div>
+              <div class="bound" data-final-bound-low="g">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="b">255</div>
+              <div class="chevron" aria-hidden="true">≤</div>
+              <div class="value-entry">
+                <input class="value-box is-blue" id="final-b" data-final-channel="b" type="number" inputmode="numeric" min="0" max="255" aria-label="최종 B 값" />
+                <span class="value-label" aria-hidden="true">B</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">≤</div>
+              <div class="bound" data-final-bound-low="b">0</div>
+            </div>
+          </div>
+          <button class="final-submit-button" id="submitFinalButton" type="button">최종 제출</button>
+          <p class="final-status" id="finalStatus" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="result-layer" id="resultLayer" hidden>
+        <div class="result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+          <p class="modal-kicker">RESULT</p>
+          <h3 class="result-title" id="resultTitle">게임 결과</h3>
+          <div class="result-text" id="resultText" aria-live="polite"></div>
+          <button class="result-button" id="closeResult" type="button">닫기</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="colormaster_redesign.js"></script>
+</body>
+</html>

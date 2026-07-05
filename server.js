@@ -27,7 +27,7 @@ const activeRooms = new Map();
 app.use(express.static(__dirname));
 
 app.get("/", (_req, res) => {
-  res.sendFile(path.join(__dirname, "Game_Screen.html"));
+  res.sendFile(path.join(__dirname, "colormaster_redesign.html"));
 });
 
 function clamp(value, min, max) {

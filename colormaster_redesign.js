@@ -1,10 +1,11 @@
 /*
-  This script connects the game UI to the Socket.IO backend:
-  - lobby join/start actions
-  - rendering room players and turn state
-  - sending guesses and final answers
-  - updating personal boundaries from server feedback
-  - showing guide/reveal/final/result popups
+  Color Master frontend controller.
+  This file connects the redesigned UI to the Socket.IO backend:
+  - lobby join/start flow
+  - server-driven rounds and turns
+  - RGB input validation
+  - personal boundary updates
+  - peek/final/result popups
 */
 
 const CHANNELS = ["r", "g", "b"];
@@ -21,11 +22,13 @@ const ERROR_LIMIT_BY_TIER = {
   orange: 150,
   red: 255
 };
+const PREVIEW_GAME_SCREEN = true;
 
+/* Socket.IO is loaded from /socket.io/socket.io.js by the HTML file. */
 const socket = typeof window.io === "function" ? window.io() : null;
-const storedUserId = sessionStorage.getItem("rgbGuessUserId");
+const storedUserId = sessionStorage.getItem("colorMasterUserId");
 const localUserId = storedUserId || `user_${Math.random().toString(36).slice(2, 9)}`;
-sessionStorage.setItem("rgbGuessUserId", localUserId);
+sessionStorage.setItem("colorMasterUserId", localUserId);
 
 const roomClient = {
   joined: false,
@@ -34,10 +37,25 @@ const roomClient = {
   hostUserId: null
 };
 
+/* Local copy of server state plus UI-only state such as boundaries and input text. */
 const game = {
   localPlayerId: localUserId,
-  players: [],
-  targetColors: [],
+  players: PREVIEW_GAME_SCREEN
+    ? [
+      { id: localUserId, name: "Player 1", isHost: true },
+      { id: "preview_2", name: "Player 2", isHost: false },
+      { id: "preview_3", name: "Player 3", isHost: false },
+      { id: "preview_4", name: "Player 4", isHost: false },
+      { id: "preview_5", name: "Player 5", isHost: false }
+    ]
+    : [],
+  targetColors: PREVIEW_GAME_SCREEN
+    ? [
+      { r: 238, g: 68, b: 88 },
+      { r: 52, g: 231, b: 145 },
+      { r: 82, g: 124, b: 255 }
+    ]
+    : [],
   targetRgb: { r: 0, g: 0, b: 0 },
   boundaries: {
     r: { low: 0, high: 255 },
@@ -45,8 +63,8 @@ const game = {
     b: { low: 0, high: 255 }
   },
   currentRound: 1,
-  currentPlayerIndex: 0,
-  phase: "lobby",
+  currentPlayerIndex: PREVIEW_GAME_SCREEN ? 0 : 0,
+  phase: PREVIEW_GAME_SCREEN ? "final" : "lobby",
   turnSeconds: 30,
   choiceSeconds: 10,
   currentSubmission: null,
@@ -59,8 +77,8 @@ const game = {
 
 let turnTimer = null;
 let choiceTimer = null;
-let responseTimers = [];
 
+/* Frequently used DOM nodes. If an ID changes in HTML, update it here too. */
 const els = {
   screenTitle: document.getElementById("screenTitle"),
   lobbyScreen: document.getElementById("lobbyScreen"),
@@ -85,14 +103,19 @@ const els = {
   closeGuide: document.getElementById("closeGuide"),
   choiceLayer: document.getElementById("choiceLayer"),
   choiceButtons: document.getElementById("choiceButtons"),
+  choicePopupTime: document.getElementById("choicePopupTime"),
   closeChoice: document.getElementById("closeChoice"),
   finalLayer: document.getElementById("finalLayer"),
+  finalPopupTime: document.getElementById("finalPopupTime"),
   finalStatus: document.getElementById("finalStatus"),
   submitFinalButton: document.getElementById("submitFinalButton"),
   resultLayer: document.getElementById("resultLayer"),
   resultText: document.getElementById("resultText"),
   closeResult: document.getElementById("closeResult"),
-  exitButton: document.getElementById("exitButton")
+  exitButton: document.getElementById("exitButton"),
+  volumeButton: document.getElementById("volumeButton"),
+  volumeSliderWrap: document.getElementById("volumeSliderWrap"),
+  volumeSlider: document.getElementById("volumeSlider")
 };
 
 function clamp(value, min, max) {
@@ -111,14 +134,15 @@ function isLobbyPhase() {
   return game.phase === "lobby" || game.phase === "waiting";
 }
 
-function possessive(name) {
-  return name.endsWith("s") ? name + "'" : name + "'s";
+function setLobbyStatus(message) {
+  els.lobbyStatus.textContent = message;
 }
 
 function rgb(color) {
   return `rgb(${color.r}, ${color.g}, ${color.b})`;
 }
 
+/* Multiple image colors are shown as vertical slices; one color is shown solid. */
 function targetBackground() {
   if (!game.targetColors.length) return "#d6d6d6";
   if (game.targetColors.length === 1) return rgb(game.targetColors[0]);
@@ -134,8 +158,6 @@ function targetBackground() {
 function clearAllTimers() {
   clearInterval(turnTimer);
   clearInterval(choiceTimer);
-  responseTimers.forEach(clearTimeout);
-  responseTimers = [];
 }
 
 function resetBoundaries() {
@@ -154,25 +176,12 @@ function playersFromServer(players) {
   }));
 }
 
-function setLobbyStatus(message) {
-  els.lobbyStatus.textContent = message;
-}
-
 function currentTitle() {
-  if (game.phase === "lobby" || game.phase === "waiting") return "Waiting Room";
-  if (game.phase === "final") return "Final Answer";
-  if (game.phase === "score") return "Game result";
-
-  const name = activePlayer().name;
-  if (isLocalTurn()) {
-    return game.phase === "guessing"
-      ? "My turn (Guessing)"
-      : "My turn (After Submission/Other players choose)";
-  }
-
-  return game.phase === "guessing"
-    ? `${possessive(name)} turn (Guessing)`
-    : `${possessive(name)} turn (After Submission/Other players choose)`;
+  if (isLobbyPhase()) return "Color Master Lobby";
+  if (game.phase === "final") return "Final Guess";
+  if (game.phase === "score") return "Game Result";
+  if (isLocalTurn()) return game.phase === "guessing" ? "My Turn" : "My Result";
+  return `${activePlayer().name}'s Turn`;
 }
 
 function renderLobby() {
@@ -186,7 +195,7 @@ function renderLobby() {
   els.lobbyPlayersList.innerHTML = game.players.length
     ? game.players.map((player) => `
       <div class="lobby-player-item">
-        <span>${player.name}${player.id === game.localPlayerId ? " (Me)" : ""}</span>
+        <span>${player.name}</span>
         <span class="lobby-player-badge">${player.isHost ? "Host" : "Player"}</span>
       </div>
     `).join("")
@@ -200,7 +209,7 @@ function renderPlayers() {
     const checked = game.responseMarks.has(player.id);
     return `
       <div class="player-row ${active ? "is-active" : ""} ${me ? "is-me" : ""}">
-        <div class="player-name">${player.name}${me ? " (Me)" : ""}</div>
+        <div class="player-name">${player.name}</div>
         <div class="player-check" aria-hidden="true">${checked ? "&#10003;" : ""}</div>
       </div>
     `;
@@ -226,6 +235,7 @@ function channelTier(channel) {
   return `tier-${feedback}`;
 }
 
+/* Builds the main RGB control stacks from current boundaries and turn editability. */
 function renderChannels() {
   const editable = game.phase === "guessing" && isLocalTurn();
 
@@ -285,15 +295,22 @@ function renderChoiceModal() {
 
   els.choiceButtons.innerHTML = CHANNELS.map((channel) => {
     const meta = CHANNEL_META[channel];
+    const bounds = game.boundaries[channel];
     const selected = game.selectedChoice === channel;
     const revealed = selected && game.currentSubmission?.guess?.[channel] !== undefined;
     const tier = revealed ? `tier-${game.currentSubmission.feedback[channel]}` : "";
     const label = revealed ? game.currentSubmission.guess[channel] : meta.label;
     const disabled = game.selectedChoice ? "disabled" : "";
     return `
-      <button class="choice-button ${meta.css} ${tier}" data-choice="${channel}" type="button" ${disabled} aria-label="Reveal ${meta.label}">
-        <span class="choice-label">${label}</span>
-      </button>
+      <div class="choice-channel">
+        <div class="choice-bound">${bounds.high}</div>
+        <div class="choice-chevron" aria-hidden="true">&le;</div>
+        <button class="choice-button ${meta.css} ${tier}" data-choice="${channel}" type="button" ${disabled} aria-label="Reveal ${meta.label}">
+          <span class="choice-label">${label}</span>
+        </button>
+        <div class="choice-chevron choice-chevron-up" aria-hidden="true">&le;</div>
+        <div class="choice-bound">${bounds.low}</div>
+      </div>
     `;
   }).join("");
 
@@ -340,7 +357,7 @@ function renderResultModal() {
 
   els.resultText.innerHTML = `
     <div class="result-row">
-      <p class="result-row-title">Correct Result</p>
+      <p class="result-row-title">Correct RGB</p>
       <div class="result-boxes" aria-label="Correct RGB result">
         ${resultBoxesFor(game.targetRgb, "Correct")}
       </div>
@@ -362,7 +379,9 @@ function render() {
 
   els.roundLabel.textContent = `Round ${Math.min(game.currentRound, TOTAL_ROUNDS)}`;
   els.timerNumber.textContent = game.phase === "choosing" ? game.choiceSeconds : game.turnSeconds;
-  els.timerCaption.textContent = game.phase === "choosing" ? "Choose" : "Time Left";
+  els.timerCaption.textContent = game.phase === "choosing" ? "PICK" : "TIME";
+  if (els.choicePopupTime) els.choicePopupTime.textContent = game.choiceSeconds;
+  if (els.finalPopupTime) els.finalPopupTime.textContent = game.turnSeconds;
   renderTargetImage();
   renderPlayers();
   renderChannels();
@@ -385,6 +404,7 @@ function readGuessFromInputs() {
   return guess;
 }
 
+/* Boundary update: intersect current bounds with the interval revealed by feedback color. */
 function tightenBoundsFromFeedback(guess, feedback, channels) {
   channels.forEach((channel) => {
     const value = Number(guess[channel]);
@@ -407,9 +427,7 @@ function startTurnCountdown(seconds) {
   turnTimer = setInterval(() => {
     game.turnSeconds -= 1;
     els.timerNumber.textContent = game.turnSeconds;
-    if (game.turnSeconds <= 0) {
-      clearInterval(turnTimer);
-    }
+    if (game.turnSeconds <= 0) clearInterval(turnTimer);
   }, 1000);
 }
 
@@ -417,12 +435,12 @@ function startChoiceCountdown(seconds) {
   clearInterval(choiceTimer);
   game.choiceSeconds = seconds;
   els.timerNumber.textContent = seconds;
+  if (els.choicePopupTime) els.choicePopupTime.textContent = seconds;
   choiceTimer = setInterval(() => {
     game.choiceSeconds -= 1;
     els.timerNumber.textContent = game.choiceSeconds;
-    if (game.choiceSeconds <= 0) {
-      clearInterval(choiceTimer);
-    }
+    if (els.choicePopupTime) els.choicePopupTime.textContent = game.choiceSeconds;
+    if (game.choiceSeconds <= 0) clearInterval(choiceTimer);
   }, 1000);
 }
 
@@ -430,9 +448,11 @@ function startFinalCountdown(seconds) {
   clearInterval(turnTimer);
   game.turnSeconds = seconds;
   els.timerNumber.textContent = seconds;
+  if (els.finalPopupTime) els.finalPopupTime.textContent = seconds;
   turnTimer = setInterval(() => {
     game.turnSeconds -= 1;
     els.timerNumber.textContent = game.turnSeconds;
+    if (els.finalPopupTime) els.finalPopupTime.textContent = game.turnSeconds;
     if (game.turnSeconds <= 0) {
       clearInterval(turnTimer);
       submitFinalAnswer(true);
@@ -481,7 +501,7 @@ function submitTurn(autoSubmit) {
   const guess = readGuessFromInputs();
   if (!guess) {
     if (!autoSubmit) {
-      els.statusLine.textContent = "Enter numbers from 0 to 255.";
+      els.statusLine.textContent = "Enter RGB numbers from 0 to 255.";
     }
     return;
   }
@@ -521,7 +541,7 @@ function submitFinalAnswer(autoSubmit = false) {
         continue;
       }
 
-      els.finalStatus.textContent = "Enter final numbers from 0 to 255.";
+      els.finalStatus.textContent = "Enter final RGB numbers from 0 to 255.";
       return;
     }
     answer[channel] = value;
@@ -646,18 +666,30 @@ function handleGameOver(data) {
   render();
 }
 
+/* UI event wiring. */
 els.nicknameInput.value = `Player ${localUserId.slice(-4)}`;
-
 els.joinRoomButton.addEventListener("click", joinRoom);
 els.startGameButton.addEventListener("click", startGameFromLobby);
 
-els.guideButton.addEventListener("click", () => {
-  els.guidePopover.hidden = false;
-});
+if (els.guideButton && els.guidePopover) {
+  els.guideButton.addEventListener("click", () => {
+    els.guidePopover.hidden = false;
+  });
+}
 
-els.closeGuide.addEventListener("click", () => {
-  els.guidePopover.hidden = true;
-});
+if (els.closeGuide && els.guidePopover) {
+  els.closeGuide.addEventListener("click", () => {
+    els.guidePopover.hidden = true;
+  });
+}
+
+if (els.volumeButton && els.volumeSliderWrap) {
+  els.volumeButton.addEventListener("click", () => {
+    const nextOpen = els.volumeSliderWrap.hidden;
+    els.volumeSliderWrap.hidden = !nextOpen;
+    els.volumeButton.setAttribute("aria-expanded", String(nextOpen));
+  });
+}
 
 els.closeChoice.addEventListener("click", () => {
   els.choiceLayer.hidden = true;
@@ -686,7 +718,10 @@ els.exitButton.addEventListener("click", () => {
   els.statusLine.textContent = "Exit action can be connected later.";
 });
 
-if (socket) {
+/* Server event wiring. */
+if (PREVIEW_GAME_SCREEN) {
+  els.statusLine.textContent = "Preview mode: set PREVIEW_GAME_SCREEN to false to use the lobby/server flow.";
+} else if (socket) {
   socket.on("connect", () => {
     setLobbyStatus("Connected. Join or create a room.");
   });
