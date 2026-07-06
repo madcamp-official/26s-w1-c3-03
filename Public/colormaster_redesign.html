@@ -167,7 +167,10 @@
             </button>
           </div>
 
-          <button class="lobby-button friends-add-button" id="addFriendButton" type="button">Add Friend</button>
+          <div class="friends-action-row">
+            <button class="lobby-button friends-add-button" id="addFriendButton" type="button">Add Friend</button>
+            <button class="lobby-button lobby-button-secondary friends-delete-mode-button" id="deleteFriendModeButton" type="button" aria-pressed="false">Delete Friend</button>
+          </div>
 
           <div class="lobby-main-layout">
             <aside class="lobby-left-rail" aria-label="Logged-in user">
@@ -349,6 +352,7 @@
           <div class="user-info-profile-area">
             <img class="user-info-main-image" id="userInfoMainImage" alt="" />
             <button class="profile-action-button user-info-image-edit-button" id="editProfileImageButton" type="button">Edit Profile Image</button>
+            <input id="profileImageFileInput" type="file" accept="image/*" hidden />
           </div>
 
           <table class="user-info-table" aria-label="Editable user information">

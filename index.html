@@ -131,6 +131,10 @@
   // 구글 신규 가입 시 임시 저장용 데이터
   let tempGoogleData = null;
 
+  const GAME_PAGE_URL = window.location.protocol === "file:"
+    ? "Public/colormaster_redesign.html"
+    : "/colormaster_redesign.html";
+
   // ---------------------------------------------------
   // 화면 내부 전환 (SPA 방식)
   // ---------------------------------------------------
@@ -159,7 +163,7 @@
     const isSuccess = await loginAsGuest(guestNick);
     if (isSuccess) {
       alert(`${guestNick}님 환영합니다!`);
-      window.location.href = "lobby.html"; // 로그인 성공 시 로비로 이동
+      window.location.href = GAME_PAGE_URL; // 로그인 성공 시 게임 로비로 이동
     }
   });
 
@@ -169,8 +173,8 @@
     const pw = document.getElementById('login-password').value;
     
     try {
-      await login(user_id, pw);
-      window.location.href = "lobby.html"; // 로그인 성공 시 로비로 이동
+      const isSuccess = await login(user_id, pw);
+      if (isSuccess) window.location.href = GAME_PAGE_URL; // 로그인 성공 시 게임 로비로 이동
     } catch (error) {
       // login 함수 내부에서 이미 alert를 띄우므로 여기선 생략해도 무방합니다.
     }
@@ -188,7 +192,7 @@
       showSection('google-signup-section'); // 신규 유저는 추가 정보 창으로
     } else if (result && !result.isNewUser) {
       alert("구글 로그인 성공!");
-      window.location.href = "lobby.html"; // 기존 유저는 바로 로비로 이동
+      window.location.href = GAME_PAGE_URL; // 기존 유저는 바로 게임 로비로 이동
     }
   });
 

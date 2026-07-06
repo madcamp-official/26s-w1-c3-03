@@ -71,17 +71,123 @@ const PREVIEW_GAME_SCREEN = false;
 */
 const socket = typeof window.io === "function" ? window.io() : null;
 
-/*
-  sessionStorage stores data only for this browser tab/session.
-  We use it to keep the same local user id after refreshes, so the server can
-  recognize the same browser as the same player.
+const LOGIN_PAGE_URL = window.location.protocol === "file:" ? "../index.html" : "/login";
+const LOGIN_MODULE_URL = window.location.protocol === "file:" ? "../login.js" : "/login.js";
+const DEFAULT_PROFILE_IMAGE = "/Images/profile.png";
 
-  if storedUserId exists, use it; else, make a new random user id 
+function normalizeProfileImage(profileImage) {
+  /*
+    Login data stores the default profile image as "profile.png".
+    The game page is inside Public, while the real image file is served from
+    /Images/profile.png, so this function converts the default value into a
+    browser-loadable URL.
+  */
+  const image = String(profileImage || "").trim();
+  if (!image || image === "profile.png") return DEFAULT_PROFILE_IMAGE;
+  return image;
+}
 
-  왜 필요한지?? 
-*/
-const storedUserId = sessionStorage.getItem("colorMasterUserId");
-const localUserId = storedUserId || `user_${Math.random().toString(36).slice(2, 9)}`;
+function normalizeLoggedInUser(user) {
+  /*
+    login.js saves the real Firebase/Firestore user in sessionStorage.
+    This normalizes the shape so the older game UI can keep reading fields like
+    mockCurrentUser.nickname and mockCurrentUser.rankingPoint.
+  */
+  const uid = user?.uid || user?.id || sessionStorage.getItem("colorMasterUserId");
+  const nickname = user?.nickname || sessionStorage.getItem("loggedInNickname") || "Player";
+  if (!uid) return null;
+
+  return {
+    id: uid,
+    uid,
+    loginId: user?.loginId || user?.user_id || "",
+    nickname,
+    rankingPoint: Number(user?.rankingPoint ?? user?.point) || 0,
+    profileImage: normalizeProfileImage(user?.profileImage || user?.profile_image),
+    password: "*******",
+    email: user?.email || "",
+    loginType: user?.loginType || sessionStorage.getItem("loginType") || "email",
+    isGuest: Boolean(user?.isGuest)
+  };
+}
+
+function loadCurrentUser() {
+  try {
+    const storedUser = sessionStorage.getItem("colorMasterCurrentUser");
+    if (storedUser) return normalizeLoggedInUser(JSON.parse(storedUser));
+  } catch (_error) {
+    // Fall through and try legacy session keys.
+  }
+
+  return normalizeLoggedInUser({
+    uid: sessionStorage.getItem("loggedInUid"),
+    nickname: sessionStorage.getItem("loggedInNickname"),
+    loginType: sessionStorage.getItem("loginType")
+  });
+}
+
+function clearLoginSession() {
+  [
+    "colorMasterCurrentUser",
+    "colorMasterUserId",
+    "colorMasterMockUser",
+    "loggedInNickname",
+    "loggedInUid",
+    "loginType"
+  ].forEach((key) => sessionStorage.removeItem(key));
+}
+
+async function updateCurrentUserPresence(online) {
+  if (!currentUserFromSession || !mockCurrentUser?.id) return;
+  try {
+    const { setUserPresence } = await import(LOGIN_MODULE_URL);
+    await setUserPresence(mockCurrentUser.id, online);
+  } catch (error) {
+    console.warn("Could not update presence:", error);
+  }
+}
+
+function refreshVisibleFriendPresence() {
+  if (roomClient.lobbyView !== "friends" || !isLobbyPhase()) return;
+  loadFriendsFromDb(true);
+}
+
+function startPresenceTracking() {
+  if (!currentUserFromSession || presenceTimer) return;
+  updateCurrentUserPresence(true);
+  presenceTimer = setInterval(() => {
+    updateCurrentUserPresence(true);
+    refreshVisibleFriendPresence();
+  }, 30000);
+}
+
+function stopPresenceTracking() {
+  if (presenceTimer) {
+    clearInterval(presenceTimer);
+    presenceTimer = null;
+  }
+  return updateCurrentUserPresence(false);
+}
+
+const currentUserFromSession = loadCurrentUser();
+if (!currentUserFromSession && !PREVIEW_GAME_SCREEN) {
+  window.location.href = LOGIN_PAGE_URL;
+}
+
+const mockCurrentUser = currentUserFromSession || {
+  id: "preview_user",
+  uid: "preview_user",
+  loginId: "",
+  nickname: "Player",
+  rankingPoint: 0,
+  profileImage: DEFAULT_PROFILE_IMAGE,
+  password: "*******",
+  email: "",
+  loginType: "preview",
+  isGuest: true
+};
+
+const localUserId = mockCurrentUser.id;
 sessionStorage.setItem("colorMasterUserId", localUserId);
 
 function createMockProfileImage(nickname, hue) {
@@ -107,59 +213,27 @@ function createMockProfileImage(nickname, hue) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-function createMockUser() {
-  const names = ["Nova", "Pixel", "Chroma", "Hue", "Prism", "Vivid", "Tint", "Luma"];
-  const nickname = `${names[Math.floor(Math.random() * names.length)]}${localUserId.slice(-3)}`;
-  const hue = Math.floor(Math.random() * 360);
-  return {
-    id: localUserId,
-    loginId: "userid123",
-    nickname,
-    rankingPoint: 900 + Math.floor(Math.random() * 1800),
-    profileImage: createMockProfileImage(nickname, hue),
-    password: "user1234",
-    email: `${nickname.toLowerCase()}@gmail.com`
-  };
-}
-
-function normalizeMockUser(user) {
-  /*
-    Older sessionStorage data may not have fields that were added later.
-    Fill those fields so the user-info popup always has complete mock data.
-  */
-  const nickname = user?.nickname || `Player${localUserId.slice(-3)}`;
-  return {
-    id: user?.id || localUserId,
-    loginId: user?.loginId || "userid123",
-    nickname,
-    rankingPoint: Number(user?.rankingPoint) || 1200,
-    profileImage: user?.profileImage || createMockProfileImage(nickname, Math.floor(Math.random() * 360)),
-    password: user?.password || "user1234",
-    email: user?.email || `${nickname.toLowerCase()}@gmail.com`
-  };
-}
-
-function loadMockUser() {
-  /*
-    Keep the random user stable during this browser session.
-    Refreshing the page keeps the same mock user; a new session can generate a new one.
-  */
-  try {
-    const storedMockUser = sessionStorage.getItem("colorMasterMockUser");
-    if (storedMockUser) return normalizeMockUser(JSON.parse(storedMockUser));
-  } catch (_error) {
-    // Fall through and create a fresh mock user if stored data is invalid.
-  }
-
-  const mockUser = normalizeMockUser(createMockUser());
-  sessionStorage.setItem("colorMasterMockUser", JSON.stringify(mockUser));
-  return mockUser;
-}
-
-const mockCurrentUser = loadMockUser();
-
 function saveMockUser() {
-  sessionStorage.setItem("colorMasterMockUser", JSON.stringify(mockCurrentUser));
+  /*
+    The user-info popup currently edits only local UI state. Keep the session
+    copy in sync so the lobby keeps showing the latest values in this tab.
+    Updating Firestore will be a separate DB-write step later.
+  */
+  const currentUser = {
+    uid: mockCurrentUser.id,
+    id: mockCurrentUser.id,
+    loginId: mockCurrentUser.loginId,
+    nickname: mockCurrentUser.nickname,
+    email: mockCurrentUser.email,
+    rankingPoint: mockCurrentUser.rankingPoint,
+    profileImage: mockCurrentUser.profileImage,
+    loginType: mockCurrentUser.loginType,
+    isGuest: mockCurrentUser.isGuest
+  };
+
+  sessionStorage.setItem("colorMasterCurrentUser", JSON.stringify(currentUser));
+  sessionStorage.setItem("colorMasterUserId", mockCurrentUser.id);
+  sessionStorage.setItem("loggedInNickname", mockCurrentUser.nickname);
 }
 
 function createMockLeaderboardUsers() {
@@ -204,44 +278,11 @@ function loadMockLeaderboardUsers() {
 
 const mockLeaderboardUsers = loadMockLeaderboardUsers();
 
-function createMockFriends() {
-  /*
-    Temporary friends data for screen development.
-    The array order is the display order: later-added friends would be lower.
-  */
-  const names = ["Milo", "Rin", "Sora", "Kite", "Luna", "Nero", "Ari", "Theo", "Mina", "Zed"];
-  return Array.from({ length: 5 }, (_, index) => {
-    const nickname = `${names[Math.floor(Math.random() * names.length)]}${Math.floor(100 + Math.random() * 900)}`;
-    const hue = Math.floor(Math.random() * 360);
-    return {
-      id: `mock_friend_${index}`,
-      nickname,
-      rankingPoint: 600 + Math.floor(Math.random() * 2600),
-      profileImage: createMockProfileImage(nickname, hue),
-      online: Math.random() >= 0.45
-    };
-  });
-}
-
-function loadMockFriends() {
-  try {
-    const storedFriends = sessionStorage.getItem("colorMasterMockFriends");
-    if (storedFriends) {
-      const friends = JSON.parse(storedFriends);
-      if (friends.length && !friends.some((friend) => friend.online)) friends[0].online = true;
-      return friends;
-    }
-  } catch (_error) {
-    // Fall through and create fresh friend data if stored data is invalid.
-  }
-
-  const friends = createMockFriends();
-  if (friends.length && !friends.some((friend) => friend.online)) friends[0].online = true;
-  sessionStorage.setItem("colorMasterMockFriends", JSON.stringify(friends));
-  return friends;
-}
-
-const mockFriends = loadMockFriends();
+let friends = [];
+let friendsLoaded = false;
+let friendsLoading = false;
+let friendsLoadPromise = null;
+let friendDeleteMode = false;
 
 function createMockMailboxNotices() {
   /*
@@ -252,7 +293,7 @@ function createMockMailboxNotices() {
   const roomNames = ["Sunset RGB", "Prism Lab", "Quick Match", "Color Sprint", "Hue Arena"];
   const now = Date.now();
   return senders.map((sender, index) => {
-    const friendRequest = index % 2 === 0;
+    const friendRequest = false;
     const hue = (index * 59 + 120) % 360;
     const level = (index % 4) + 1;
     const maxPlayers = 2 + (index % 4);
@@ -318,7 +359,9 @@ function loadMockMailboxNotices() {
   try {
     const storedNotices = sessionStorage.getItem("colorMasterMockMailbox");
     if (storedNotices) {
-      const notices = JSON.parse(storedNotices).map(normalizeMockMailboxNotice);
+      const notices = JSON.parse(storedNotices)
+        .map(normalizeMockMailboxNotice)
+        .filter((notice) => notice.type !== "friend");
       sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(notices));
       return notices;
     }
@@ -332,10 +375,13 @@ function loadMockMailboxNotices() {
 }
 
 function saveMockMailboxNotices() {
-  sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(mockMailboxNotices));
+  const localOnlyNotices = mockMailboxNotices.filter((notice) => notice.source !== "db");
+  sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(localOnlyNotices));
 }
 
 let mockMailboxNotices = loadMockMailboxNotices();
+let mailboxLoading = false;
+let mailboxLoadPromise = null;
 
 const MAILBOX_LAST_SEEN_KEY = "colorMasterMailboxLastSeenAt";
 
@@ -368,6 +414,43 @@ function updateMailboxUnreadDots() {
 function markMailboxAsSeen() {
   sessionStorage.setItem(MAILBOX_LAST_SEEN_KEY, String(Math.max(Date.now(), latestMailboxTimestamp())));
   updateMailboxUnreadDots();
+}
+
+async function loadMailboxNoticesFromDb(force = false) {
+  if (!mockCurrentUser.id) return mockMailboxNotices;
+  if (mailboxLoadPromise) return mailboxLoadPromise;
+  if (!force && mockMailboxNotices.some((notice) => notice.source === "db")) return mockMailboxNotices;
+
+  mailboxLoading = true;
+  renderMailboxNotices();
+  if (els.mailboxStatus) els.mailboxStatus.textContent = "Loading notices...";
+
+  mailboxLoadPromise = import(LOGIN_MODULE_URL)
+    .then(({ getMailboxNotices }) => getMailboxNotices(mockCurrentUser.id))
+    .then((dbNotices) => {
+      const localNotices = mockMailboxNotices.filter((notice) => notice.source !== "db");
+      mockMailboxNotices = [...dbNotices, ...localNotices]
+        .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      renderMailboxNotices();
+      updateMailboxUnreadDots();
+      markMailboxAsSeen();
+      if (els.mailboxStatus) els.mailboxStatus.textContent = mockMailboxNotices.length
+        ? "Click a message to read the full notice."
+        : "No notices.";
+      return mockMailboxNotices;
+    })
+    .catch((error) => {
+      console.error("Failed to load mailbox notices:", error);
+      if (els.mailboxStatus) els.mailboxStatus.textContent = "Could not load notices from DB.";
+      return mockMailboxNotices;
+    })
+    .finally(() => {
+      mailboxLoading = false;
+      mailboxLoadPromise = null;
+      renderMailboxNotices();
+    });
+
+  return mailboxLoadPromise;
 }
 
 /*
@@ -486,6 +569,7 @@ const game = {
 */
 let turnTimer = null;
 let choiceTimer = null;
+let presenceTimer = null;
 
 /*
   Frequently used DOM nodes.
@@ -544,6 +628,7 @@ const els = {
   friendsProfileLogOutButton: document.getElementById("friendsProfileLogOutButton"),
   mailboxCloseButton: document.getElementById("mailboxCloseButton"),
   addFriendButton: document.getElementById("addFriendButton"),
+  deleteFriendModeButton: document.getElementById("deleteFriendModeButton"),
   addFriendLayer: document.getElementById("addFriendLayer"),
   closeAddFriendButton: document.getElementById("closeAddFriendButton"),
   addFriendNicknameInput: document.getElementById("addFriendNicknameInput"),
@@ -556,6 +641,7 @@ const els = {
   closeUserInfoButton: document.getElementById("closeUserInfoButton"),
   userInfoMainImage: document.getElementById("userInfoMainImage"),
   editProfileImageButton: document.getElementById("editProfileImageButton"),
+  profileImageFileInput: document.getElementById("profileImageFileInput"),
   userInfoIdInput: document.getElementById("userInfoIdInput"),
   userInfoNicknameInput: document.getElementById("userInfoNicknameInput"),
   userInfoPasswordInput: document.getElementById("userInfoPasswordInput"),
@@ -793,15 +879,15 @@ function renderRoomList() {
 function renderRankingTable() {
   // Paint the temporary leaderboard table in highest-ranking-point order.
   if (!els.rankingTableBody) return;
-  els.rankingTableBody.innerHTML = mockLeaderboardUsers
-    .map((user) => user.id === game.localPlayerId
-      ? {
-        ...user,
-        nickname: mockCurrentUser.nickname,
-        rankingPoint: mockCurrentUser.rankingPoint,
-        profileImage: mockCurrentUser.profileImage
-      }
-      : user)
+  const usersById = new Map(mockLeaderboardUsers.map((user) => [user.id, user]));
+  usersById.set(game.localPlayerId, {
+    id: game.localPlayerId,
+    nickname: mockCurrentUser.nickname,
+    rankingPoint: mockCurrentUser.rankingPoint,
+    profileImage: mockCurrentUser.profileImage
+  });
+
+  els.rankingTableBody.innerHTML = [...usersById.values()]
     .sort((a, b) => b.rankingPoint - a.rankingPoint)
     .map((user, index) => `
       <tr class="${user.id === game.localPlayerId ? "is-me" : ""}">
@@ -813,14 +899,69 @@ function renderRankingTable() {
     `).join("");
 }
 
+async function loadFriendsFromDb(force = false) {
+  if (!mockCurrentUser.id) return [];
+  if (friendsLoadPromise) return friendsLoadPromise;
+  if (friendsLoaded && !force) return friends;
+
+  friendsLoading = true;
+  renderFriendsTable();
+  if (els.friendsStatus) els.friendsStatus.textContent = "Loading friends...";
+
+  friendsLoadPromise = import(LOGIN_MODULE_URL)
+    .then(({ getFriends }) => getFriends(mockCurrentUser.id))
+    .then((dbFriends) => {
+      friends = dbFriends;
+      friendsLoaded = true;
+      renderFriendsTable();
+      if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) renderInviteFriendList();
+      if (els.friendsStatus) {
+        els.friendsStatus.textContent = friends.length
+          ? "Recently added friends appear lower."
+          : "No friends yet.";
+      }
+      return friends;
+    })
+    .catch((error) => {
+      console.error("Failed to load friends:", error);
+      if (els.friendsStatus) els.friendsStatus.textContent = "Could not load friends from DB.";
+      return friends;
+    })
+    .finally(() => {
+      friendsLoading = false;
+      friendsLoadPromise = null;
+      renderFriendsTable();
+      if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) renderInviteFriendList();
+    });
+
+  return friendsLoadPromise;
+}
+
 function renderFriendsTable() {
   /*
-    Paint the temporary friends table.
-    Unlike the leaderboard, this keeps the stored array order because later-added
-    friends should eventually appear lower in the list.
+    Paint the friends table from Firestore-backed data.
+    The array order is kept as loaded; later DB work can add explicit ordering.
   */
   if (!els.friendsTableBody) return;
-  els.friendsTableBody.innerHTML = mockFriends.map((friend, index) => {
+  if (friendsLoading) {
+    els.friendsTableBody.innerHTML = `
+      <tr>
+        <td class="friends-empty" colspan="5">Loading friends...</td>
+      </tr>
+    `;
+    return;
+  }
+
+  if (!friends.length) {
+    els.friendsTableBody.innerHTML = `
+      <tr>
+        <td class="friends-empty" colspan="5">No friends yet.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  els.friendsTableBody.innerHTML = friends.map((friend, index) => {
     const statusClass = friend.online ? "is-online" : "is-offline";
     const statusText = friend.online ? "Online" : "Offline";
     return `
@@ -830,19 +971,31 @@ function renderFriendsTable() {
         <td>${escapeHtml(friend.nickname)}</td>
         <td>${friend.rankingPoint} RP</td>
         <td>
-          <span class="friend-status">
-            <span class="friend-status-dot ${statusClass}" aria-hidden="true"></span>
-            ${statusText}
-          </span>
+          <div class="friend-status-cell">
+            <span class="friend-status">
+              <span class="friend-status-dot ${statusClass}" aria-hidden="true"></span>
+              ${statusText}
+            </span>
+            <button class="friend-delete-button" type="button" data-delete-friend="${escapeHtml(friend.id)}" aria-label="Delete ${escapeHtml(friend.nickname)}" ${friendDeleteMode ? "" : "hidden disabled"}>Delete</button>
+          </div>
         </td>
       </tr>
     `;
   }).join("");
+
+  document.querySelectorAll("[data-delete-friend]").forEach((button) => {
+    button.addEventListener("click", () => deleteFriend(button.dataset.deleteFriend));
+  });
 }
 
 function renderMailboxNotices() {
   // Paint the temporary mailbox notice list.
   if (!els.mailboxNoticeList) return;
+  if (mailboxLoading) {
+    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">Loading notices...</div>`;
+    return;
+  }
+
   if (!mockMailboxNotices.length) {
     els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">No notices.</div>`;
     return;
@@ -867,9 +1020,9 @@ function renderMailboxNotices() {
 }
 
 function renderInviteFriendList() {
-  // Paint online mock friends inside the waiting-lobby invite popup.
+  // Paint online friends inside the waiting-lobby invite popup.
   if (!els.inviteFriendTableBody) return;
-  const onlineFriends = mockFriends.filter((friend) => friend.online);
+  const onlineFriends = friends.filter((friend) => friend.online);
 
   if (!onlineFriends.length) {
     els.inviteFriendTableBody.innerHTML = `
@@ -897,6 +1050,7 @@ function renderInviteFriendList() {
 function openInviteFriendModal() {
   // Show online friends after the user clicks an empty waiting-room slot.
   if (!els.inviteFriendLayer) return;
+  loadFriendsFromDb();
   renderInviteFriendList();
   els.inviteFriendLayer.hidden = false;
   if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "Choose an online friend to invite.";
@@ -909,9 +1063,56 @@ function closeInviteFriendModal() {
 
 function sendGameInvite(friendId) {
   // Temporary frontend-only behavior until real invite delivery is connected.
-  const friend = mockFriends.find((item) => item.id === friendId);
+  const friend = friends.find((item) => item.id === friendId);
   if (!friend) return;
   if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = `Game invite sent to ${friend.nickname}.`;
+}
+
+function updateFriendDeleteModeButton() {
+  if (!els.deleteFriendModeButton) return;
+  els.deleteFriendModeButton.classList.toggle("is-active", friendDeleteMode);
+  els.deleteFriendModeButton.setAttribute("aria-pressed", String(friendDeleteMode));
+  els.deleteFriendModeButton.textContent = friendDeleteMode ? "Cancel Delete" : "Delete Friend";
+}
+
+function toggleFriendDeleteMode() {
+  friendDeleteMode = !friendDeleteMode;
+  updateFriendDeleteModeButton();
+  renderFriendsTable();
+  if (els.friendsStatus) {
+    els.friendsStatus.textContent = friendDeleteMode
+      ? "Choose a friend to delete."
+      : "Recently added friends appear lower.";
+  }
+}
+
+async function deleteFriend(friendId) {
+  const friend = friends.find((item) => item.id === friendId);
+  if (!friend) return;
+
+  const button = document.querySelector(`[data-delete-friend="${CSS.escape(friendId)}"]`);
+  const previousButtonText = button?.textContent || "Delete";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Deleting...";
+  }
+  if (els.friendsStatus) els.friendsStatus.textContent = `Deleting ${friend.nickname}...`;
+
+  try {
+    const { deleteFriend: deleteFriendFromDb } = await import(LOGIN_MODULE_URL);
+    await deleteFriendFromDb(mockCurrentUser.id, friendId);
+    friends = friends.filter((item) => item.id !== friendId);
+    renderFriendsTable();
+    if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) renderInviteFriendList();
+    if (els.friendsStatus) els.friendsStatus.textContent = `${friend.nickname} removed from friends.`;
+  } catch (error) {
+    console.error("Failed to delete friend:", error);
+    if (els.friendsStatus) els.friendsStatus.textContent = error.message || "Could not delete friend.";
+    if (button) {
+      button.disabled = false;
+      button.textContent = previousButtonText;
+    }
+  }
 }
 
 function renderLobby() {
@@ -1491,11 +1692,7 @@ function closeAddFriendModal() {
   if (els.addFriendLayer) els.addFriendLayer.hidden = true;
 }
 
-function sendFriendRequest() {
-  /*
-    Temporary frontend-only behavior.
-    Later this will send the nickname to the backend/DB server.
-  */
+async function sendFriendRequest() {
   const nickname = els.addFriendNicknameInput.value.trim();
   if (!nickname) {
     els.addFriendNicknameInput.focus();
@@ -1503,8 +1700,27 @@ function sendFriendRequest() {
     return;
   }
 
-  closeAddFriendModal();
-  if (els.friendsStatus) els.friendsStatus.textContent = `Friend request sent to ${nickname}.`;
+  const previousButtonText = els.sendFriendRequestButton?.textContent || "Send Request";
+  if (els.sendFriendRequestButton) {
+    els.sendFriendRequestButton.disabled = true;
+    els.sendFriendRequestButton.textContent = "Saving...";
+  }
+  if (els.friendsStatus) els.friendsStatus.textContent = `Sending friend request to ${nickname}...`;
+
+  try {
+    const { sendFriendRequestByNickname } = await import(LOGIN_MODULE_URL);
+    const friend = await sendFriendRequestByNickname(mockCurrentUser.id, nickname);
+    closeAddFriendModal();
+    if (els.friendsStatus) els.friendsStatus.textContent = `Friend request sent to ${friend.nickname}.`;
+  } catch (error) {
+    console.error("Failed to add friend:", error);
+    if (els.friendsStatus) els.friendsStatus.textContent = error.message || "Could not add friend.";
+  } finally {
+    if (els.sendFriendRequestButton) {
+      els.sendFriendRequestButton.disabled = false;
+      els.sendFriendRequestButton.textContent = previousButtonText;
+    }
+  }
 }
 
 function createRoomFromLobby() {
@@ -1597,7 +1813,8 @@ function showFriendsPage() {
   roomClient.lobbyView = "friends";
   game.phase = "lobby";
   render();
-  if (els.friendsStatus) els.friendsStatus.textContent = "Recently added friends appear lower.";
+  updateFriendDeleteModeButton();
+  loadFriendsFromDb(true);
 }
 
 function openMailboxModal() {
@@ -1605,9 +1822,9 @@ function openMailboxModal() {
   if (!els.mailboxLayer) return;
   closeProfileMenus();
   renderMailboxNotices();
-  markMailboxAsSeen();
   els.mailboxLayer.hidden = false;
   if (els.mailboxStatus) els.mailboxStatus.textContent = "Click a message to read the full notice.";
+  loadMailboxNoticesFromDb(true);
 }
 
 function closeMailboxModal() {
@@ -1663,12 +1880,56 @@ function enableUserInfoInput(inputId) {
 }
 
 function editProfileImage() {
-  // Temporary behavior: generate a fresh mock profile image.
-  const hue = Math.floor(Math.random() * 360);
-  mockCurrentUser.profileImage = createMockProfileImage(mockCurrentUser.nickname, hue);
-  saveMockUser();
-  renderLobbyUser();
-  renderUserInfoPopup();
+  if (!els.profileImageFileInput) return;
+  els.profileImageFileInput.value = "";
+  els.profileImageFileInput.click();
+}
+
+function profileImageDisplayUrl(downloadUrl) {
+  const separator = downloadUrl.includes("?") ? "&" : "?";
+  return `${downloadUrl}${separator}updated=${Date.now()}`;
+}
+
+async function uploadSelectedProfileImage(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    alert("Please choose an image file.");
+    event.target.value = "";
+    return;
+  }
+
+  const previousButtonText = els.editProfileImageButton?.textContent || "Edit Profile Image";
+  if (els.editProfileImageButton) {
+    els.editProfileImageButton.disabled = true;
+    els.editProfileImageButton.textContent = "Uploading...";
+  }
+
+  try {
+    const { updateProfileImage } = await import(LOGIN_MODULE_URL);
+    const downloadUrl = await updateProfileImage(file, mockCurrentUser.id);
+    if (!downloadUrl) throw new Error("Profile image upload did not return a URL.");
+
+    mockCurrentUser.profileImage = profileImageDisplayUrl(downloadUrl);
+    saveMockUser();
+    renderLobbyUser();
+    renderUserInfoPopup();
+
+    if (els.editProfileImageButton) {
+      els.editProfileImageButton.textContent = "Uploaded";
+      setTimeout(() => {
+        if (els.editProfileImageButton) els.editProfileImageButton.textContent = previousButtonText;
+      }, 1200);
+    }
+  } catch (error) {
+    console.error("Profile image upload failed:", error);
+    alert("Profile image upload failed. Please try again.");
+    if (els.editProfileImageButton) els.editProfileImageButton.textContent = previousButtonText;
+  } finally {
+    if (els.editProfileImageButton) els.editProfileImageButton.disabled = false;
+    event.target.value = "";
+  }
 }
 
 function saveUserInfoChanges() {
@@ -1743,22 +2004,56 @@ function closeMailboxDetail() {
   if (els.mailboxDetailLayer) els.mailboxDetailLayer.hidden = true;
 }
 
-function handleMailboxResponse(noticeId, response) {
-  // Temporary frontend-only accept/reject behavior until backend actions exist.
+async function handleMailboxResponse(noticeId, response) {
   const notice = mockMailboxNotices.find((item) => item.id === noticeId);
   if (!notice) return;
   const actionText = response === "accept" ? "Accepted" : "Rejected";
   const targetText = notice.type === "friend" ? "friend request" : "game invite";
-  mockMailboxNotices = mockMailboxNotices.filter((item) => item.id !== noticeId);
-  saveMockMailboxNotices();
-  updateMailboxUnreadDots();
-  closeMailboxDetail();
-  renderMailboxNotices();
-  if (els.mailboxStatus) els.mailboxStatus.textContent = `${actionText} ${targetText} from ${notice.sender}.`;
+
+  try {
+    if (notice.source === "db" && notice.type === "friend") {
+      const actions = await import(LOGIN_MODULE_URL);
+      if (response === "accept") {
+        const friend = await actions.acceptFriendRequest(mockCurrentUser.id, notice.id);
+        friends = [
+          ...friends.filter((item) => item.id !== friend.id),
+          friend
+        ];
+        friendsLoaded = true;
+        renderFriendsTable();
+      } else {
+        await actions.rejectFriendRequest(mockCurrentUser.id, notice.id);
+      }
+    }
+
+    mockMailboxNotices = mockMailboxNotices.filter((item) => item.id !== noticeId);
+    saveMockMailboxNotices();
+    updateMailboxUnreadDots();
+    closeMailboxDetail();
+    renderMailboxNotices();
+    if (els.mailboxStatus) els.mailboxStatus.textContent = `${actionText} ${targetText} from ${notice.sender}.`;
+  } catch (error) {
+    console.error("Failed to respond to mailbox notice:", error);
+    if (els.mailboxStatus) els.mailboxStatus.textContent = error.message || "Could not update this notice.";
+  }
 }
 
-function deleteMailboxNotice(noticeId) {
+async function deleteMailboxNotice(noticeId) {
   // Remove one temporary notice and persist that deletion for this browser session.
+  const notice = mockMailboxNotices.find((item) => item.id === noticeId);
+  if (!notice) return;
+
+  try {
+    if (notice.source === "db") {
+      const { deleteMailboxNotice: deleteMailboxNoticeFromDb } = await import(LOGIN_MODULE_URL);
+      await deleteMailboxNoticeFromDb(mockCurrentUser.id, noticeId);
+    }
+  } catch (error) {
+    console.error("Failed to delete mailbox notice:", error);
+    if (els.mailboxStatus) els.mailboxStatus.textContent = error.message || "Could not delete notice.";
+    return;
+  }
+
   mockMailboxNotices = mockMailboxNotices.filter((notice) => notice.id !== noticeId);
   saveMockMailboxNotices();
   updateMailboxUnreadDots();
@@ -2125,6 +2420,10 @@ els.rankingHomeButton.addEventListener("click", () => showMainLobbyPage());
 els.friendsHomeButton.addEventListener("click", () => showMainLobbyPage());
 els.mailboxCloseButton.addEventListener("click", closeMailboxModal);
 
+if (els.deleteFriendModeButton) {
+  els.deleteFriendModeButton.addEventListener("click", toggleFriendDeleteMode);
+}
+
 [
   [els.lobbyProfileBox, els.lobbyProfileMenu],
   [els.rankingProfileBox, els.rankingProfileMenu],
@@ -2169,10 +2468,11 @@ document.addEventListener("click", () => {
   els.friendsProfileLogOutButton
 ].forEach((button) => {
   if (!button) return;
-  button.addEventListener("click", () => {
+  button.addEventListener("click", async () => {
     closeProfileMenus();
-    const message = "Log out flow will be connected after the guest lobby is built.";
-    setLobbyPageMessage(message);
+    await stopPresenceTracking();
+    clearLoginSession();
+    window.location.href = LOGIN_PAGE_URL;
   });
 });
 
@@ -2248,6 +2548,10 @@ document.querySelectorAll("[data-user-info-edit]").forEach((button) => {
 
 if (els.editProfileImageButton) {
   els.editProfileImageButton.addEventListener("click", editProfileImage);
+}
+
+if (els.profileImageFileInput) {
+  els.profileImageFileInput.addEventListener("change", uploadSelectedProfileImage);
 }
 
 if (els.saveUserInfoButton) {
@@ -2349,6 +2653,17 @@ els.exitButton.addEventListener("click", () => {
   els.statusLine.textContent = "Exit action can be connected later.";
 });
 
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    updateCurrentUserPresence(true);
+    refreshVisibleFriendPresence();
+  }
+});
+
+window.addEventListener("pagehide", () => {
+  stopPresenceTracking();
+});
+
 
 /*
   Server event wiring.
@@ -2402,3 +2717,7 @@ if (PREVIEW_GAME_SCREEN) {
 
 // Initial paint. Without this call, the page would keep only the raw HTML defaults.
 render();
+if (currentUserFromSession) {
+  startPresenceTracking();
+  loadMailboxNoticesFromDb(false);
+}

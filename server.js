@@ -88,6 +88,24 @@ const activeRooms = new Map();
 */
 const PUBLIC_DIR = path.join(__dirname, "Public");
 const IMAGE_DIR = path.join(__dirname, "Images");
+const LOGIN_HTML = path.join(__dirname, "index.html");
+
+// Login files live at the project root, while the game files live in Public.
+app.get(["/login", "/index.html"], (_req, res) => {
+  res.sendFile(LOGIN_HTML);
+});
+
+app.get("/login.js", (_req, res) => {
+  res.sendFile(path.join(__dirname, "login.js"));
+});
+
+app.get("/auth.css", (_req, res) => {
+  res.sendFile(path.join(__dirname, "auth.css"));
+});
+
+app.get("/common.css", (_req, res) => {
+  res.sendFile(path.join(__dirname, "common.css"));
+});
 
 // When the user opens http://localhost:3000/, send the main game HTML.
 app.get("/", (_req, res) => {
