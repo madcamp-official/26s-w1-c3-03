@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<!--
+  This file is the HTML skeleton for Color Master.
+  HTML describes the page structure; CSS controls how it looks; JavaScript controls behavior.
+-->
+<html lang="ko">
+
+<!-- head is metadata: encoding, mobile viewport, title, font, CSS. Users do not directly see most of it. -->
+<head>
+  <!-- UTF-8 lets the browser correctly read Korean text, symbols, and normal English text. -->
+  <meta charset="UTF-8" />
+
+  <!-- Makes the layout size itself to the device width, which is essential for mobile screens. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- The browser tab title. This is not the visible in-page title. -->
+  <title>Color Master - Game Screen</title>
+
+  <!-- Loads the Pretendard web font from a CDN before the local stylesheet uses it. -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.min.css" />
+
+  <!-- Loads this project's CSS file. Classes in this HTML are styled there. -->
+  <link rel="stylesheet" href="colormaster_redesign.css" />
+</head>
+
+<body>
+  <!-- <main> marks the primary content of the page for browsers and assistive technology. -->
+  <main class="app">
+    <!-- JavaScript changes this heading as the game phase changes. -->
+    <h1 class="screen-title" id="screenTitle">내 턴 - RGB 추측</h1>
+
+    <!--
+      Lobby screen shown before the server starts a room game.
+      A <section> groups a meaningful part of the page; aria-label names it for screen readers, 
+      for convenience.
+    -->
+    <section class="lobby-screen" id="lobbyScreen" aria-label="Color Master lobby">
+      <!-- This wrapper exists mostly for layout/styling. A plain <div> has no special meaning. -->
+      <div class="lobby-card">
+        <p class="eyebrow">REAL-TIME RGB GUESS</p>
+        <h2 class="lobby-title">Color Master</h2>
+
+        <!-- aria-live="polite" tells screen readers to announce text changes here without interrupting. -->
+        <p class="lobby-status" id="lobbyStatus" aria-live="polite">Connect to the server, then join a room.</p>
+
+        <!-- Main lobby: shows rooms that have been created and are still waiting. -->
+        <section class="main-lobby-panel" id="mainLobbyPanel" aria-label="Waiting rooms">
+          <label class="lobby-field lobby-nickname-field">
+            <span>Nickname</span>
+            <input id="nicknameInput" type="text" autocomplete="off" />
+          </label>
+
+          <div class="lobby-toolbar">
+            <h3 class="lobby-section-title">Waiting Rooms</h3>
+            <button class="lobby-button" id="openCreateRoomButton" type="button">Create a room</button>
+          </div>
+
+          <!-- Empty on purpose: JavaScript fills this with the current room list. -->
+          <div class="room-list" id="roomList" aria-label="Currently waiting rooms"></div>
+        </section>
+
+        <!-- Waiting lobby: shown after this browser joins one room. -->
+        <section class="waiting-lobby-panel" id="waitingLobbyPanel" aria-label="Players waiting in room" hidden>
+          <div class="waiting-header">
+            <div>
+              <h3 class="lobby-section-title" id="waitingRoomTitle">Waiting Room</h3>
+              <p class="waiting-room-meta" id="waitingRoomMeta"></p>
+            </div>
+            <button class="lobby-button lobby-button-secondary" id="leaveRoomButton" type="button">Leave</button>
+          </div>
+
+          <!-- Empty on purpose: JavaScript fills this with the current waiting players. -->
+          <div class="lobby-player-list" id="lobbyPlayersList"></div>
+
+          <!-- JavaScript shows this only for the host and enables it when at least two players are present. -->
+          <button class="lobby-button" id="startGameButton" type="button" disabled hidden>Start Game</button>
+        </section>
+      </div>
+
+      <!-- Create-room popup. It is hidden until the user clicks "Create a room". -->
+      <div class="create-room-layer" id="createRoomLayer" hidden>
+        <div class="create-room-panel" role="dialog" aria-modal="true" aria-labelledby="createRoomTitle">
+          <div class="create-room-header">
+            <h3 class="lobby-section-title" id="createRoomTitle">Create Room</h3>
+            <button class="popup-close" id="closeCreateRoomButton" type="button" aria-label="Close create room">x</button>
+          </div>
+
+          <div class="create-room-form">
+            <label class="lobby-field">
+              <span>Room Name</span>
+              <input id="createRoomNameInput" type="text" autocomplete="off" maxlength="32" />
+            </label>
+            <label class="lobby-field">
+              <span>Room Code (optional)</span>
+              <input id="createRoomCodeInput" type="text" autocomplete="off" maxlength="18" />
+            </label>
+            <label class="lobby-field">
+              <span>Room Level</span>
+              <select id="createLevelSelect">
+                <option value="1">1 color</option>
+                <option value="2">2 colors</option>
+                <option value="3">3 colors</option>
+                <option value="4">4 colors</option>
+              </select>
+            </label>
+            <label class="lobby-field">
+              <span>Players</span>
+              <select id="maxPlayersSelect">
+                <option value="2">2 players</option>
+                <option value="3">3 players</option>
+                <option value="4">4 players</option>
+                <option value="5">5 players</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="lobby-actions">
+            <button class="lobby-button" id="createRoomButton" type="button">Create Room</button>
+            <button class="lobby-button lobby-button-secondary" id="cancelCreateRoomButton" type="button">Close</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!--
+      Main game board. The hidden attribute keeps it invisible until JavaScript removes hidden.
+      The id="gameBoard" is how JavaScript finds this section.
+    -->
+    <section class="game-board" id="gameBoard" aria-label="컬러마스터 플레이 화면" hidden>
+      <!-- Decorative background elements. aria-hidden keeps screen readers from announcing them. -->
+      <div class="ambient ambient-one" aria-hidden="true"></div>
+      <div class="ambient ambient-two" aria-hidden="true"></div>
+
+      <!-- Exit button. The image is decorative, so alt="" avoids duplicate screen-reader text. -->
+      <button class="exit-button" id="exitButton" type="button" aria-label="나가기">
+        <img class="exit-icon" src="/Images/exit_icon.png" alt="" />
+      </button>
+
+      <!-- Volume control placeholder: the slider UI is wired now; real audio control can be added later. -->
+      <div class="volume-control" id="volumeControl">
+        <!-- This wrapper starts hidden; JavaScript shows it when the volume button is opened. -->
+        <div class="volume-slider-wrap" id="volumeSliderWrap" hidden>
+          <input class="volume-slider" id="volumeSlider" type="range" min="0" max="100" value="70" aria-label="Volume" />
+        </div>
+        <!-- aria-expanded describes whether the button's related control is currently open. -->
+        <button class="volume-button" id="volumeButton" type="button" aria-label="볼륨 조절" aria-expanded="false">
+          <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+        </button>
+      </div>
+
+      <!-- <header> introduces the main game board area. -->
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">REAL-TIME RGB GUESS</p>
+          <h2 class="game-title">Color Master</h2>
+        </div>
+      </header>
+
+      <!-- <aside> is supporting content beside the main play area: round, timer, player list. -->
+      <!-- left sidebar -->
+      <aside class="sidebar">
+        <div class="round-card">
+          <span class="round-caption">현재 라운드</span>
+          <!-- JavaScript updates this text to Round 1, Round 2, etc. -->
+          <h2 class="round-label" id="roundLabel">Round 1</h2>
+        </div>
+
+        <!-- Timer display. aria-live helps announce countdown changes. -->
+        <div class="timer" aria-live="polite">
+          <div class="timer-inner">
+            <span class="timer-number" id="timerNumber">30</span>
+            <span class="timer-caption" id="timerCaption">SECONDS</span>
+          </div>
+        </div>
+
+        <section class="player-panel" aria-label="플레이어 목록">
+          <div class="panel-heading">
+            <span>Players</span>
+          </div>
+          <!-- Empty on purpose: JavaScript renders the current player list here. -->
+          <div class="players" id="playersList"></div>
+        </section>
+      </aside>
+
+      <!-- The central gameplay area: target image plus the RGB guessing controls. -->
+      <section class="play-area">
+        <div class="target-card">
+          <div class="card-label">TARGET IMAGE</div>
+          <!-- This div behaves like an image because JavaScript paints its background color/gradient. -->
+          <div class="image-stage" id="targetImage" role="img" aria-label="추측해야 할 평균 색상"></div>
+          <p class="target-helper">이미지의 평균 RGB 값을 추측하세요.</p>
+        </div>
+
+        <div class="guess-card">
+          <div class="guess-header">
+            <span>RGB Guess</span>
+            <small>0부터 255까지 입력</small>
+          </div>
+          <!-- Empty on purpose: JavaScript builds the R/G/B controls according to game state. -->
+          <div class="rgb-controls" id="rgbControls"></div>
+          <!-- Status messages such as errors or turn guidance appear here. -->
+          <p class="status-line" id="statusLine" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <!-- Another supporting side area: color reference and error legend. -->
+      <!-- right sidebar -->
+      <aside class="right-rail">
+        <!-- The RGB map is always visible so players do not need to open a guide popup. -->
+        <section class="guide-card" aria-label="RGB 색상 가이드">
+          <div class="panel-heading">
+            <span>Color Guide</span>
+          </div>
+          <img class="guide-image" src="/Images/rgb_guide.png" alt="RGB 색상 가이드" />
+        </section>
+
+        <!-- Static legend explaining how error distance maps to feedback colors. -->
+        <section class="legend-card" aria-label="오차 색상 가이드">
+          <div class="panel-heading">
+            <span>Error Guide</span>
+            <!-- <small>오차 범위</small> -->
+          </div>
+          <div class="legend">
+            <div class="legend-row"><span>Error = 0</span><span class="legend-dot dot-blue"></span></div>
+            <div class="legend-row"><span>Error ≤ 10</span><span class="legend-dot dot-green"></span></div>
+            <div class="legend-row"><span>Error ≤ 50</span><span class="legend-dot dot-yellow"></span></div>
+            <div class="legend-row"><span>Error ≤ 150</span><span class="legend-dot dot-orange"></span></div>
+            <div class="legend-row"><span>Error ≤ 255</span><span class="legend-dot dot-red"></span></div>
+          </div>
+        </section>
+      </aside>
+
+      <!--
+        Peek-choice modal layer.
+        It starts hidden and is shown during the phase where a player chooses which channel to inspect.
+      -->
+      <div class="choice-layer" id="choiceLayer" hidden>
+        <!-- role="dialog" and aria-modal identify this as a modal popup to assistive technology. -->
+        <div class="choice-card" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+          <div class="choice-popup-timer" aria-live="polite">
+            <span class="choice-popup-time" id="choicePopupTime">10</span>
+            <span class="choice-popup-caption">SECONDS</span>
+          </div>
+          <button class="choice-close" id="closeChoice" type="button" aria-label="선택창 닫기">×</button>
+          <p class="modal-kicker">PEEK PHASE</p>
+          <h3 class="choice-title" id="choiceTitle">어떤 색을 볼까요?</h3>
+          <!-- Empty on purpose: JavaScript inserts R/G/B choice buttons here. -->
+          <div class="choice-buttons" id="choiceButtons"></div>
+        </div>
+      </div>
+
+      <!-- Final guess modal layer shown at the end of the round sequence. -->
+      <div class="final-layer" id="finalLayer" hidden>
+        <div class="final-modal" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
+          <div class="final-popup-timer" aria-live="polite">
+            <span class="final-popup-time" id="finalPopupTime">30</span>
+            <span class="final-popup-caption">SECONDS</span>
+          </div>
+          <p class="modal-kicker">FINAL GUESS</p>
+          <h4 class="final-title" id="finalTitle">최종 답안</h4>
+          <!-- Like targetImage, this is painted by JavaScript instead of using an <img>. -->
+          <div class="final-target-image" id="finalTargetImage" role="img" aria-label="최종 추측 대상 색상"></div>
+          <!-- The three final-channel blocks repeat the same structure for R, G, and B. -->
+          <div class="final-inputs" aria-label="최종 RGB 입력">
+            <div class="final-channel">
+              <!-- data-* attributes store custom data for JavaScript without changing HTML semantics. -->
+              <div class="bound" data-final-bound-high="r">255</div>
+              <div class="chevron" aria-hidden="true">≤</div>
+              <div class="value-entry">
+                <!-- type="number" gives numeric input UI; min/max express the valid value range. -->
+                <input class="value-box is-red" id="final-r" data-final-channel="r" type="number" inputmode="numeric" min="0" max="255" aria-label="최종 R 값" />
+                <span class="value-label" aria-hidden="true">R</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">≤</div>
+              <div class="bound" data-final-bound-low="r">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="g">255</div>
+              <div class="chevron" aria-hidden="true">≤</div>
+              <div class="value-entry">
+                <input class="value-box is-green" id="final-g" data-final-channel="g" type="number" inputmode="numeric" min="0" max="255" aria-label="최종 G 값" />
+                <span class="value-label" aria-hidden="true">G</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">≤</div>
+              <div class="bound" data-final-bound-low="g">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="b">255</div>
+              <div class="chevron" aria-hidden="true">≤</div>
+              <div class="value-entry">
+                <input class="value-box is-blue" id="final-b" data-final-channel="b" type="number" inputmode="numeric" min="0" max="255" aria-label="최종 B 값" />
+                <span class="value-label" aria-hidden="true">B</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">≤</div>
+              <div class="bound" data-final-bound-low="b">0</div>
+            </div>
+          </div>
+          <button class="final-submit-button" id="submitFinalButton" type="button">최종 제출</button>
+          <!-- useful for after submitting the guess but waiting for others to submit -->
+          <p class="final-status" id="finalStatus" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <!-- Result modal layer shown after the server sends final scoring data. -->
+      <!-- will be modified later... -->
+      <div class="result-layer" id="resultLayer" hidden>
+        <div class="result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+          <p class="modal-kicker">RESULT</p>
+          <h3 class="result-title" id="resultTitle">게임 결과</h3>
+          <!-- Empty on purpose: JavaScript inserts the result summary here. -->
+          <div class="result-text" id="resultText" aria-live="polite"></div>
+          <button class="result-button" id="closeResult" type="button">닫기</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Socket.IO client script served automatically by the Node Socket.IO server. -->
+  <script src="/socket.io/socket.io.js"></script>
+
+  <!-- This project's frontend behavior: event listeners, socket handling, rendering, timers. -->
+  <script src="colormaster_redesign.js"></script>
+</body>
+</html>

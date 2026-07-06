@@ -49,7 +49,15 @@
 
 > 서비스의 전체 페이지 구조와 페이지 간 이동 흐름; 각 페이지의 주요 UI 구성, 입력 요소, 버튼, 사용자 행동 흐름 등을 간단한 와이어프레임 형태로 정리
 
-<img width="1404" height="1149" alt="Image" src="https://github.com/user-attachments/assets/f5aca856-eb16-4f4a-b5c3-0b438ca0f746" />
+### 플로우 차트
+<img width="2228" height="1392" alt="Image" src="https://github.com/user-attachments/assets/54f8a99a-94cb-4227-9250-49d2ca585e75" />
+
+### 화면 설계서
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/deb5d6e7-d90a-46b3-8e7a-96c261b5b9d6" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/563d753b-8a0a-4076-9a50-f9daa192c0ce" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/cda0bc97-11d4-474c-a66c-651358dc3183" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/63d65647-8801-4ffc-99c6-46eb146f0252" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/f03231dc-fca4-4bb6-9abb-937356782790" />
 
 ---
 
@@ -57,7 +65,7 @@
 
 > 필요한 테이블, 주요 필드, 데이터 타입, 테이블 간 관계를 정리
 
-<img width="1488" height="647" alt="Image" src="https://github.com/user-attachments/assets/b98d2cbe-be16-4966-a4d7-d5a2ec408f48" />
+<img width="1472" height="706" alt="Image" src="https://github.com/user-attachments/assets/edb6cbd0-97a5-4637-b574-7f8435262cc9" />
 
 ---
 
