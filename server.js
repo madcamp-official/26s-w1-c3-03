@@ -18,11 +18,25 @@
 // path is a built-in Node.js module for safely building file paths.
 const path = require("path");
 
+// fs reads the Firebase service-account JSON file from disk.
+const fs = require("fs");
+
+// crypto creates a random download token for uploaded profile images.
+const crypto = require("crypto");
+
 // express serves the HTML/CSS/JS/image files to the browser.
 const express = require("express");
 
 // http creates the actual web server that Express and Socket.IO share.
 const http = require("http");
+
+// firebase-admin lets this trusted Node server write to Firestore/Storage.
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
+const { getStorage } = require("firebase-admin/storage");
+
+// multer parses multipart/form-data file uploads from the browser.
+const multer = require("multer");
 
 // Socket.IO provides real-time browser <-> server events.
 const { Server } = require("socket.io");
@@ -35,6 +49,43 @@ const server = http.createServer(app);
 
 // io is the Socket.IO server. Use it to listen for connections and emit events.
 const io = new Server(server);
+
+const FIREBASE_STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || "colormaster-madcamp.firebasestorage.app";
+const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
+  || path.join(__dirname, "secrets", "firebase-service-account.json");
+
+let adminDb = null;
+let adminBucket = null;
+
+function initializeFirebaseAdmin() {
+  /*
+    This server-side Firebase connection is used only for trusted backend work.
+    The service account file must stay out of Git because it is a private key.
+  */
+  if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+    console.warn(`Firebase service account not found: ${SERVICE_ACCOUNT_PATH}`);
+    console.warn("Profile image upload API will return 503 until it is configured.");
+    return;
+  }
+
+  const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
+  const firebaseApp = initializeApp({
+    credential: cert(serviceAccount),
+    storageBucket: FIREBASE_STORAGE_BUCKET
+  });
+
+  adminDb = getFirestore(firebaseApp);
+  adminBucket = getStorage(firebaseApp).bucket();
+}
+
+initializeFirebaseAdmin();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024
+  }
+});
 
 /*
   Central game settings.
@@ -105,6 +156,67 @@ app.get("/auth.css", (_req, res) => {
 
 app.get("/common.css", (_req, res) => {
   res.sendFile(path.join(__dirname, "common.css"));
+});
+
+app.post("/api/profile-image", upload.single("profileImage"), async (req, res) => {
+  /*
+    Profile image upload proxy:
+    Browser -> this Express server -> Firebase Storage + Firestore.
+
+    This avoids uploading directly from the browser to Firebase Storage. On EC2,
+    this same route will run on the Ubuntu server and the upload traffic to
+    Firebase will originate from EC2.
+  */
+  try {
+    if (!adminDb || !adminBucket) {
+      return res.status(503).json({ error: "Firebase Admin is not configured on the server." });
+    }
+
+    const userId = String(req.body.userId || "").trim();
+    const file = req.file;
+    const allowedTypes = new Map([
+      ["image/jpeg", "jpg"],
+      ["image/png", "png"],
+      ["image/webp", "webp"],
+      ["image/gif", "gif"]
+    ]);
+
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId." });
+    }
+
+    if (!file || !allowedTypes.has(file.mimetype)) {
+      return res.status(400).json({ error: "Please upload a JPG, PNG, WEBP, or GIF image." });
+    }
+
+    const extension = allowedTypes.get(file.mimetype);
+    const token = crypto.randomUUID();
+    const filePath = `profile_images/${userId}_${Date.now()}.${extension}`;
+    const storageFile = adminBucket.file(filePath);
+
+    await storageFile.save(file.buffer, {
+      resumable: false,
+      metadata: {
+        contentType: file.mimetype,
+        metadata: {
+          firebaseStorageDownloadTokens: token
+        }
+      }
+    });
+
+    const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${adminBucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+
+    await adminDb.collection("User").doc(userId).update({
+      profile_image: downloadUrl
+    });
+
+    res.json({
+      profileImage: downloadUrl
+    });
+  } catch (error) {
+    console.error("Profile image upload failed:", error);
+    res.status(500).json({ error: "Profile image upload failed." });
+  }
 });
 
 // When the user opens http://localhost:3000/, send the main game HTML.

@@ -1890,12 +1890,40 @@ function profileImageDisplayUrl(downloadUrl) {
   return `${downloadUrl}${separator}updated=${Date.now()}`;
 }
 
+async function uploadProfileImageViaServer(file) {
+  /*
+    Send the selected image to our Node/EC2 server first.
+    The server then uploads it to Firebase Storage using the Admin SDK.
+  */
+  const formData = new FormData();
+  formData.append("userId", mockCurrentUser.id);
+  formData.append("profileImage", file);
+
+  const response = await fetch("/api/profile-image", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Profile image upload failed.");
+  }
+
+  return data.profileImage;
+}
+
 async function uploadSelectedProfileImage(event) {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  if (!file.type.startsWith("image/")) {
-    alert("Please choose an image file.");
+  if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+    alert("Please choose a JPG, PNG, WEBP, or GIF image.");
+    event.target.value = "";
+    return;
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    alert("Profile image must be 2MB or smaller.");
     event.target.value = "";
     return;
   }
@@ -1907,8 +1935,7 @@ async function uploadSelectedProfileImage(event) {
   }
 
   try {
-    const { updateProfileImage } = await import(LOGIN_MODULE_URL);
-    const downloadUrl = await updateProfileImage(file, mockCurrentUser.id);
+    const downloadUrl = await uploadProfileImageViaServer(file);
     if (!downloadUrl) throw new Error("Profile image upload did not return a URL.");
 
     mockCurrentUser.profileImage = profileImageDisplayUrl(downloadUrl);
