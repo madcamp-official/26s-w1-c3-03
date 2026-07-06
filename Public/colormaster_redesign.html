@@ -37,26 +37,188 @@
     <section class="lobby-screen" id="lobbyScreen" aria-label="Color Master lobby">
       <!-- This wrapper exists mostly for layout/styling. A plain <div> has no special meaning. -->
       <div class="lobby-card">
-        <p class="eyebrow">REAL-TIME RGB GUESS</p>
-        <h2 class="lobby-title">Color Master</h2>
-
-        <!-- aria-live="polite" tells screen readers to announce text changes here without interrupting. -->
-        <p class="lobby-status" id="lobbyStatus" aria-live="polite">Connect to the server, then join a room.</p>
-
         <!-- Main lobby: shows rooms that have been created and are still waiting. -->
         <section class="main-lobby-panel" id="mainLobbyPanel" aria-label="Waiting rooms">
-          <label class="lobby-field lobby-nickname-field">
-            <span>Nickname</span>
-            <input id="nicknameInput" type="text" autocomplete="off" />
-          </label>
-
-          <div class="lobby-toolbar">
-            <h3 class="lobby-section-title">Waiting Rooms</h3>
-            <button class="lobby-button" id="openCreateRoomButton" type="button">Create a room</button>
+          <div class="lobby-top-actions" aria-label="Lobby navigation">
+            <button class="lobby-nav-button" id="leaderBoardsButton" type="button">Leader Boards</button>
+            <button class="lobby-nav-button" id="friendsButton" type="button">Friends</button>
+            <button class="lobby-nav-button" id="mailboxButton" type="button">Mailbox</button>
+            <button class="lobby-home-button" id="homeButton" type="button" aria-label="Home" disabled>
+              <img class="lobby-home-icon" src="/Images/exit_icon.png" alt="" />
+            </button>
           </div>
 
-          <!-- Empty on purpose: JavaScript fills this with the current room list. -->
-          <div class="room-list" id="roomList" aria-label="Currently waiting rooms"></div>
+          <div class="lobby-main-layout">
+            <aside class="lobby-left-rail" aria-label="Logged-in user">
+              <section class="lobby-profile-box" id="lobbyProfileBox" role="button" tabindex="0" aria-controls="lobbyProfileMenu" aria-expanded="false">
+                <img class="lobby-profile-image" id="lobbyProfileImage" alt="" />
+                <div class="lobby-profile-text">
+                  <div class="lobby-profile-name" id="lobbyNickname">Player</div>
+                  <div class="lobby-profile-rp" id="lobbyRankingPoint">0 RP</div>
+                </div>
+              </section>
+
+              <div class="profile-action-menu" id="lobbyProfileMenu" hidden>
+                <button class="profile-action-button" id="lobbyUserInfoButton" type="button">User Info</button>
+                <button class="profile-action-button" id="lobbyProfileLogOutButton" type="button">Log Out</button>
+              </div>
+
+              <!-- Hidden for now: the real server still uses this value as the in-room nickname. -->
+              <input class="lobby-hidden-input" id="nicknameInput" type="text" autocomplete="off" tabindex="-1" aria-hidden="true" />
+
+              <button class="lobby-button lobby-create-button" id="openCreateRoomButton" type="button">Create Room</button>
+            </aside>
+
+            <section class="lobby-room-panel" aria-label="Current rooms">
+              <div class="lobby-room-heading">
+                <div>
+                  <p class="eyebrow">REAL-TIME RGB GUESS</p>
+                  <h2 class="lobby-title">Current Rooms</h2>
+                </div>
+                <!-- aria-live="polite" tells screen readers to announce text changes here without interrupting. -->
+                <p class="lobby-status" id="lobbyStatus" aria-live="polite">Connect to the server, then join a room.</p>
+              </div>
+
+              <!-- Empty on purpose: JavaScript fills this with the current room list. -->
+              <div class="room-list" id="roomList" aria-label="Currently waiting rooms"></div>
+            </section>
+          </div>
+
+          <div class="lobby-volume-control">
+            <div class="lobby-volume-slider-wrap" id="lobbyVolumeSliderWrap" hidden>
+              <input class="lobby-volume-slider" id="lobbyVolumeSlider" type="range" min="0" max="100" value="70" aria-label="Lobby volume" />
+            </div>
+            <button class="lobby-volume-button" id="lobbyVolumeButton" type="button" aria-label="Volume" aria-expanded="false">
+              <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+            </button>
+          </div>
+        </section>
+
+        <!-- Ranking page: shown when the logged-in user opens Leader Boards. -->
+        <section class="ranking-page-panel" id="rankingPagePanel" aria-label="Leader boards" hidden>
+          <div class="lobby-top-actions" aria-label="Ranking navigation">
+            <button class="lobby-nav-button" id="rankingLeaderBoardsButton" type="button" disabled>Leader Boards</button>
+            <button class="lobby-nav-button" id="rankingFriendsButton" type="button">Friends</button>
+            <button class="lobby-nav-button" id="rankingMailboxButton" type="button">Mailbox</button>
+            <button class="lobby-home-button" id="rankingHomeButton" type="button" aria-label="Home">
+              <img class="lobby-home-icon" src="/Images/exit_icon.png" alt="" />
+            </button>
+          </div>
+
+          <div class="lobby-main-layout">
+            <aside class="lobby-left-rail" aria-label="Logged-in user">
+              <section class="lobby-profile-box" id="rankingProfileBox" role="button" tabindex="0" aria-controls="rankingProfileMenu" aria-expanded="false">
+                <img class="lobby-profile-image" id="rankingProfileImage" alt="" />
+                <div class="lobby-profile-text">
+                  <div class="lobby-profile-name" id="rankingNickname">Player</div>
+                  <div class="lobby-profile-rp" id="rankingRankingPoint">0 RP</div>
+                </div>
+              </section>
+
+              <div class="profile-action-menu" id="rankingProfileMenu" hidden>
+                <button class="profile-action-button" id="rankingUserInfoButton" type="button">User Info</button>
+                <button class="profile-action-button" id="rankingProfileLogOutButton" type="button">Log Out</button>
+              </div>
+            </aside>
+
+            <section class="ranking-panel" aria-label="Ranking table">
+              <div class="lobby-room-heading">
+                <div>
+                  <p class="eyebrow">PLAYER RANKING</p>
+                  <h2 class="lobby-title">Leader Boards</h2>
+                </div>
+                <p class="lobby-status" id="rankingStatus" aria-live="polite">Highest ranking points first.</p>
+              </div>
+
+              <div class="ranking-table-wrap">
+                <table class="ranking-table">
+                  <thead>
+                    <tr>
+                      <th>Index</th>
+                      <th>Profile</th>
+                      <th>Nickname</th>
+                      <th>Ranking Point</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rankingTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <div class="lobby-volume-control">
+            <div class="lobby-volume-slider-wrap" id="rankingVolumeSliderWrap" hidden>
+              <input class="lobby-volume-slider" id="rankingVolumeSlider" type="range" min="0" max="100" value="70" aria-label="Ranking page volume" />
+            </div>
+            <button class="lobby-volume-button" id="rankingVolumeButton" type="button" aria-label="Volume" aria-expanded="false">
+              <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+            </button>
+          </div>
+        </section>
+
+        <!-- Friends page: shown when the logged-in user opens Friends. -->
+        <section class="friends-page-panel" id="friendsPagePanel" aria-label="Friends" hidden>
+          <div class="lobby-top-actions" aria-label="Friends navigation">
+            <button class="lobby-nav-button" id="friendsLeaderBoardsButton" type="button">Leader Boards</button>
+            <button class="lobby-nav-button" id="friendsFriendsButton" type="button" disabled>Friends</button>
+            <button class="lobby-nav-button" id="friendsMailboxButton" type="button">Mailbox</button>
+            <button class="lobby-home-button" id="friendsHomeButton" type="button" aria-label="Home">
+              <img class="lobby-home-icon" src="/Images/exit_icon.png" alt="" />
+            </button>
+          </div>
+
+          <button class="lobby-button friends-add-button" id="addFriendButton" type="button">Add Friend</button>
+
+          <div class="lobby-main-layout">
+            <aside class="lobby-left-rail" aria-label="Logged-in user">
+              <section class="lobby-profile-box" id="friendsProfileBox" role="button" tabindex="0" aria-controls="friendsProfileMenu" aria-expanded="false">
+                <img class="lobby-profile-image" id="friendsProfileImage" alt="" />
+                <div class="lobby-profile-text">
+                  <div class="lobby-profile-name" id="friendsNickname">Player</div>
+                  <div class="lobby-profile-rp" id="friendsRankingPoint">0 RP</div>
+                </div>
+              </section>
+
+              <div class="profile-action-menu" id="friendsProfileMenu" hidden>
+                <button class="profile-action-button" id="friendsUserInfoButton" type="button">User Info</button>
+                <button class="profile-action-button" id="friendsProfileLogOutButton" type="button">Log Out</button>
+              </div>
+            </aside>
+
+            <section class="friends-panel" aria-label="Friends table">
+              <div class="lobby-room-heading">
+                <div>
+                  <p class="eyebrow">SOCIAL</p>
+                  <h2 class="lobby-title">Friends</h2>
+                </div>
+                <p class="lobby-status" id="friendsStatus" aria-live="polite">Recently added friends appear lower.</p>
+              </div>
+
+              <div class="friends-table-wrap">
+                <table class="friends-table">
+                  <thead>
+                    <tr>
+                      <th>Index</th>
+                      <th>Profile</th>
+                      <th>Nickname</th>
+                      <th>Ranking Point</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="friendsTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <div class="lobby-volume-control">
+            <div class="lobby-volume-slider-wrap" id="friendsVolumeSliderWrap" hidden>
+              <input class="lobby-volume-slider" id="friendsVolumeSlider" type="range" min="0" max="100" value="70" aria-label="Friends page volume" />
+            </div>
+            <button class="lobby-volume-button" id="friendsVolumeButton" type="button" aria-label="Volume" aria-expanded="false">
+              <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+            </button>
+          </div>
         </section>
 
         <!-- Waiting lobby: shown after this browser joins one room. -->
@@ -118,6 +280,146 @@
             <button class="lobby-button" id="createRoomButton" type="button">Create Room</button>
             <button class="lobby-button lobby-button-secondary" id="cancelCreateRoomButton" type="button">Close</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Private-room code popup. It replaces the browser prompt for private rooms. -->
+      <div class="private-room-code-layer" id="privateRoomCodeLayer" hidden>
+        <div class="private-room-code-panel" role="dialog" aria-modal="true" aria-labelledby="privateRoomCodeTitle">
+          <div class="create-room-header">
+            <h3 class="lobby-section-title" id="privateRoomCodeTitle">Private Room</h3>
+            <button class="popup-close" id="closePrivateRoomCodeButton" type="button" aria-label="Close private room code">x</button>
+          </div>
+
+          <label class="lobby-field">
+            <span>Room Code</span>
+            <input id="privateRoomCodeInput" type="text" autocomplete="off" maxlength="18" />
+          </label>
+
+          <button class="lobby-button private-room-code-submit-button" id="submitPrivateRoomCodeButton" type="button">Join Room</button>
+        </div>
+      </div>
+
+      <!-- Add-friend popup. It is hidden until the user clicks "Add Friend". -->
+      <div class="add-friend-layer" id="addFriendLayer" hidden>
+        <div class="add-friend-panel" role="dialog" aria-modal="true" aria-labelledby="addFriendTitle">
+          <div class="add-friend-header">
+            <h3 class="lobby-section-title" id="addFriendTitle">Add Friend</h3>
+            <button class="popup-close" id="closeAddFriendButton" type="button" aria-label="Close add friend">x</button>
+          </div>
+
+          <label class="lobby-field">
+            <span>User Nickname</span>
+            <input id="addFriendNicknameInput" type="text" autocomplete="off" maxlength="32" />
+          </label>
+
+          <button class="lobby-button add-friend-submit-button" id="sendFriendRequestButton" type="button">Send Request</button>
+        </div>
+      </div>
+
+      <!-- Mailbox popup. It is hidden until the user clicks "Mailbox". -->
+      <div class="mailbox-layer" id="mailboxLayer" hidden>
+        <div class="mailbox-panel" role="dialog" aria-modal="true" aria-labelledby="mailboxTitle">
+          <div class="mailbox-header">
+            <div>
+              <p class="eyebrow">NOTICES</p>
+              <h3 class="lobby-section-title" id="mailboxTitle">Mailbox</h3>
+            </div>
+            <button class="mailbox-close-button" id="mailboxCloseButton" type="button" aria-label="Close mailbox">
+              <img class="mailbox-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
+          </div>
+
+          <p class="lobby-status" id="mailboxStatus" aria-live="polite">Click a message to read the full notice.</p>
+
+          <!-- Empty on purpose: JavaScript fills this with notice buttons. -->
+          <div class="mailbox-notice-list" id="mailboxNoticeList"></div>
+        </div>
+      </div>
+
+      <!-- User-info popup. It is hidden until the user clicks "User Info". -->
+      <div class="user-info-layer" id="userInfoLayer" hidden>
+        <div class="user-info-panel" role="dialog" aria-modal="true" aria-labelledby="userInfoTitle">
+          <button class="user-info-close-button" id="closeUserInfoButton" type="button" aria-label="Close user info">
+            <img class="user-info-close-icon" src="/Images/close_icon.png" alt="" />
+          </button>
+
+          <h3 class="lobby-section-title user-info-title" id="userInfoTitle">User Info</h3>
+
+          <div class="user-info-profile-area">
+            <img class="user-info-main-image" id="userInfoMainImage" alt="" />
+            <button class="profile-action-button user-info-image-edit-button" id="editProfileImageButton" type="button">Edit Profile Image</button>
+          </div>
+
+          <table class="user-info-table" aria-label="Editable user information">
+            <tbody>
+              <tr>
+                <th scope="row">id</th>
+                <td><input class="user-info-input" id="userInfoIdInput" type="text" disabled /></td>
+                <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoIdInput">Edit</button></td>
+              </tr>
+              <tr>
+                <th scope="row">nickname</th>
+                <td><input class="user-info-input" id="userInfoNicknameInput" type="text" disabled /></td>
+                <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoNicknameInput">Edit</button></td>
+              </tr>
+              <tr>
+                <th scope="row">password</th>
+                <td><input class="user-info-input" id="userInfoPasswordInput" type="password" disabled /></td>
+                <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoPasswordInput">Edit</button></td>
+              </tr>
+              <tr>
+                <th scope="row">email</th>
+                <td><input class="user-info-input" id="userInfoEmailInput" type="email" disabled /></td>
+                <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoEmailInput">Edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <button class="lobby-button user-info-save-button" id="saveUserInfoButton" type="button">Save</button>
+        </div>
+      </div>
+
+      <!-- Invite-friend popup. It opens from empty player slots in the waiting lobby. -->
+      <div class="invite-friend-layer" id="inviteFriendLayer" hidden>
+        <div class="invite-friend-panel" role="dialog" aria-modal="true" aria-labelledby="inviteFriendTitle">
+          <div class="invite-friend-header">
+            <div>
+              <p class="eyebrow">ONLINE FRIENDS</p>
+              <h3 class="lobby-section-title" id="inviteFriendTitle">Invite Friend</h3>
+            </div>
+            <button class="invite-friend-close-button" id="closeInviteFriendButton" type="button" aria-label="Close invite friend">
+              <img class="invite-friend-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
+          </div>
+
+          <p class="lobby-status" id="inviteFriendStatus" aria-live="polite">Choose an online friend to invite.</p>
+
+          <div class="invite-friend-table-wrap">
+            <table class="invite-friend-table">
+              <thead>
+                <tr>
+                  <th>Index</th>
+                  <th>Profile</th>
+                  <th>Nickname</th>
+                  <th>Invite</th>
+                </tr>
+              </thead>
+              <tbody id="inviteFriendTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mailbox detail popup. It opens when a notice message is clicked. -->
+      <div class="mailbox-detail-layer" id="mailboxDetailLayer" hidden>
+        <div class="mailbox-detail-panel" role="dialog" aria-modal="true" aria-labelledby="mailboxDetailTitle">
+          <div class="mailbox-detail-header">
+            <h3 class="lobby-section-title" id="mailboxDetailTitle">Notice</h3>
+            <button class="popup-close" id="closeMailboxDetailButton" type="button" aria-label="Close mailbox notice">x</button>
+          </div>
+
+          <div class="mailbox-detail-content" id="mailboxDetailContent"></div>
         </div>
       </div>
     </section>

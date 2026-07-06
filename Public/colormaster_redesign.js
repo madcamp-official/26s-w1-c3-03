@@ -84,6 +84,292 @@ const storedUserId = sessionStorage.getItem("colorMasterUserId");
 const localUserId = storedUserId || `user_${Math.random().toString(36).slice(2, 9)}`;
 sessionStorage.setItem("colorMasterUserId", localUserId);
 
+function createMockProfileImage(nickname, hue) {
+  /*
+    Temporary profile image for screen development.
+    Later this can be replaced with a real image URL from the login/DB server.
+  */
+  const initials = nickname.slice(0, 2).toUpperCase();
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="hsl(${hue}, 88%, 62%)"/>
+          <stop offset="100%" stop-color="hsl(${(hue + 72) % 360}, 82%, 44%)"/>
+        </linearGradient>
+      </defs>
+      <rect width="160" height="160" rx="24" fill="url(#g)"/>
+      <circle cx="80" cy="62" r="30" fill="rgba(255,255,255,0.82)"/>
+      <path d="M34 142c8-32 28-48 46-48s38 16 46 48" fill="rgba(255,255,255,0.82)"/>
+      <text x="80" y="88" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="800" fill="rgba(20,24,50,0.72)">${initials}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function createMockUser() {
+  const names = ["Nova", "Pixel", "Chroma", "Hue", "Prism", "Vivid", "Tint", "Luma"];
+  const nickname = `${names[Math.floor(Math.random() * names.length)]}${localUserId.slice(-3)}`;
+  const hue = Math.floor(Math.random() * 360);
+  return {
+    id: localUserId,
+    loginId: "userid123",
+    nickname,
+    rankingPoint: 900 + Math.floor(Math.random() * 1800),
+    profileImage: createMockProfileImage(nickname, hue),
+    password: "user1234",
+    email: `${nickname.toLowerCase()}@gmail.com`
+  };
+}
+
+function normalizeMockUser(user) {
+  /*
+    Older sessionStorage data may not have fields that were added later.
+    Fill those fields so the user-info popup always has complete mock data.
+  */
+  const nickname = user?.nickname || `Player${localUserId.slice(-3)}`;
+  return {
+    id: user?.id || localUserId,
+    loginId: user?.loginId || "userid123",
+    nickname,
+    rankingPoint: Number(user?.rankingPoint) || 1200,
+    profileImage: user?.profileImage || createMockProfileImage(nickname, Math.floor(Math.random() * 360)),
+    password: user?.password || "user1234",
+    email: user?.email || `${nickname.toLowerCase()}@gmail.com`
+  };
+}
+
+function loadMockUser() {
+  /*
+    Keep the random user stable during this browser session.
+    Refreshing the page keeps the same mock user; a new session can generate a new one.
+  */
+  try {
+    const storedMockUser = sessionStorage.getItem("colorMasterMockUser");
+    if (storedMockUser) return normalizeMockUser(JSON.parse(storedMockUser));
+  } catch (_error) {
+    // Fall through and create a fresh mock user if stored data is invalid.
+  }
+
+  const mockUser = normalizeMockUser(createMockUser());
+  sessionStorage.setItem("colorMasterMockUser", JSON.stringify(mockUser));
+  return mockUser;
+}
+
+const mockCurrentUser = loadMockUser();
+
+function saveMockUser() {
+  sessionStorage.setItem("colorMasterMockUser", JSON.stringify(mockCurrentUser));
+}
+
+function createMockLeaderboardUsers() {
+  /*
+    Temporary ranking data for screen development.
+    Later this array can come from the real user/ranking API.
+  */
+  const names = ["Aster", "Brite", "Cipher", "Dawn", "Echo", "Flare", "Glint", "Halo", "Iris", "Jade"];
+  const users = [{
+    id: mockCurrentUser.id,
+    nickname: mockCurrentUser.nickname,
+    rankingPoint: mockCurrentUser.rankingPoint,
+    profileImage: mockCurrentUser.profileImage
+  }];
+
+  while (users.length < 5) {
+    const name = `${names[Math.floor(Math.random() * names.length)]}${Math.floor(100 + Math.random() * 900)}`;
+    const hue = Math.floor(Math.random() * 360);
+    users.push({
+      id: `mock_rank_${users.length}`,
+      nickname: name,
+      rankingPoint: 700 + Math.floor(Math.random() * 2400),
+      profileImage: createMockProfileImage(name, hue)
+    });
+  }
+
+  return users.sort((a, b) => b.rankingPoint - a.rankingPoint);
+}
+
+function loadMockLeaderboardUsers() {
+  try {
+    const storedUsers = sessionStorage.getItem("colorMasterMockLeaderboard");
+    if (storedUsers) return JSON.parse(storedUsers);
+  } catch (_error) {
+    // Fall through and create fresh ranking data if stored data is invalid.
+  }
+
+  const users = createMockLeaderboardUsers();
+  sessionStorage.setItem("colorMasterMockLeaderboard", JSON.stringify(users));
+  return users;
+}
+
+const mockLeaderboardUsers = loadMockLeaderboardUsers();
+
+function createMockFriends() {
+  /*
+    Temporary friends data for screen development.
+    The array order is the display order: later-added friends would be lower.
+  */
+  const names = ["Milo", "Rin", "Sora", "Kite", "Luna", "Nero", "Ari", "Theo", "Mina", "Zed"];
+  return Array.from({ length: 5 }, (_, index) => {
+    const nickname = `${names[Math.floor(Math.random() * names.length)]}${Math.floor(100 + Math.random() * 900)}`;
+    const hue = Math.floor(Math.random() * 360);
+    return {
+      id: `mock_friend_${index}`,
+      nickname,
+      rankingPoint: 600 + Math.floor(Math.random() * 2600),
+      profileImage: createMockProfileImage(nickname, hue),
+      online: Math.random() >= 0.45
+    };
+  });
+}
+
+function loadMockFriends() {
+  try {
+    const storedFriends = sessionStorage.getItem("colorMasterMockFriends");
+    if (storedFriends) {
+      const friends = JSON.parse(storedFriends);
+      if (friends.length && !friends.some((friend) => friend.online)) friends[0].online = true;
+      return friends;
+    }
+  } catch (_error) {
+    // Fall through and create fresh friend data if stored data is invalid.
+  }
+
+  const friends = createMockFriends();
+  if (friends.length && !friends.some((friend) => friend.online)) friends[0].online = true;
+  sessionStorage.setItem("colorMasterMockFriends", JSON.stringify(friends));
+  return friends;
+}
+
+const mockFriends = loadMockFriends();
+
+function createMockMailboxNotices() {
+  /*
+    Temporary mailbox notices for screen development.
+    Type "friend" means a friend request; type "invite" means a game invite.
+  */
+  const senders = ["Aster421", "Milo208", "Rin774", "Sora315", "Luna902"];
+  const roomNames = ["Sunset RGB", "Prism Lab", "Quick Match", "Color Sprint", "Hue Arena"];
+  const now = Date.now();
+  return senders.map((sender, index) => {
+    const friendRequest = index % 2 === 0;
+    const hue = (index * 59 + 120) % 360;
+    const level = (index % 4) + 1;
+    const maxPlayers = 2 + (index % 4);
+    const currentPlayers = Math.min(maxPlayers, 1 + (index % maxPlayers));
+    return {
+      id: `mock_notice_${index}`,
+      type: friendRequest ? "friend" : "invite",
+      sender,
+      createdAt: now - (senders.length - index) * 1000,
+      profileImage: createMockProfileImage(sender, hue),
+      rankingPoint: 700 + index * 330,
+      message: friendRequest
+        ? `"${sender}" has sent you a friend request.`
+        : `"${sender}" has invited you to a game.`,
+      fullMessage: friendRequest
+        ? `"${sender}" has sent you a friend request. Friend request accept/decline actions will be connected later.`
+        : `"${sender}" has invited you to a game. Game invite join/decline actions will be connected later.`,
+      room: friendRequest
+        ? null
+        : {
+          name: roomNames[index],
+          level,
+          currentPlayers,
+          maxPlayers
+        }
+    };
+  });
+}
+
+function normalizeMockMailboxNotice(notice, index) {
+  // Fill fields added after older sessionStorage mailbox data was created.
+  const sender = notice?.sender || `User${index + 1}`;
+  const type = notice?.type === "invite" ? "invite" : "friend";
+  const hue = (index * 59 + 120) % 360;
+  const level = Number(notice?.room?.level) || ((index % 4) + 1);
+  const maxPlayers = Number(notice?.room?.maxPlayers) || (2 + (index % 4));
+  const currentPlayers = Number(notice?.room?.currentPlayers) || Math.min(maxPlayers, 1 + (index % maxPlayers));
+  return {
+    id: notice?.id || `mock_notice_${index}`,
+    type,
+    sender,
+    createdAt: Number(notice?.createdAt) || Date.now() - (index + 1) * 1000,
+    profileImage: notice?.profileImage || createMockProfileImage(sender, hue),
+    rankingPoint: Number(notice?.rankingPoint) || (700 + index * 330),
+    message: notice?.message || (type === "friend"
+      ? `"${sender}" has sent you a friend request.`
+      : `"${sender}" has invited you to a game.`),
+    fullMessage: notice?.fullMessage || (type === "friend"
+      ? `"${sender}" has sent you a friend request.`
+      : `"${sender}" has invited you to a game.`),
+    room: type === "invite"
+      ? {
+        name: notice?.room?.name || "Quick Match",
+        level,
+        currentPlayers,
+        maxPlayers
+      }
+      : null
+  };
+}
+
+function loadMockMailboxNotices() {
+  try {
+    const storedNotices = sessionStorage.getItem("colorMasterMockMailbox");
+    if (storedNotices) {
+      const notices = JSON.parse(storedNotices).map(normalizeMockMailboxNotice);
+      sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(notices));
+      return notices;
+    }
+  } catch (_error) {
+    // Fall through and create fresh mailbox data if stored data is invalid.
+  }
+
+  const notices = createMockMailboxNotices();
+  sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(notices));
+  return notices;
+}
+
+function saveMockMailboxNotices() {
+  sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(mockMailboxNotices));
+}
+
+let mockMailboxNotices = loadMockMailboxNotices();
+
+const MAILBOX_LAST_SEEN_KEY = "colorMasterMailboxLastSeenAt";
+
+function latestMailboxTimestamp() {
+  // New-mail checks compare the newest notice timestamp to the last mailbox-open time.
+  return mockMailboxNotices.reduce((latest, notice) => {
+    return Math.max(latest, Number(notice.createdAt) || 0);
+  }, 0);
+}
+
+function hasUnreadMailboxNotices() {
+  const lastSeenAt = Number(sessionStorage.getItem(MAILBOX_LAST_SEEN_KEY)) || 0;
+  return latestMailboxTimestamp() > lastSeenAt;
+}
+
+function updateMailboxUnreadDots() {
+  // The same Mailbox button appears on several lobby-style screens.
+  const hasUnread = hasUnreadMailboxNotices();
+  [
+    els.mailboxButton,
+    els.rankingMailboxButton,
+    els.friendsMailboxButton
+  ].forEach((button) => {
+    if (!button) return;
+    button.classList.toggle("has-unread-mail", hasUnread);
+    button.setAttribute("aria-label", hasUnread ? "Mailbox, new mail" : "Mailbox");
+  });
+}
+
+function markMailboxAsSeen() {
+  sessionStorage.setItem(MAILBOX_LAST_SEEN_KEY, String(Math.max(Date.now(), latestMailboxTimestamp())));
+  updateMailboxUnreadDots();
+}
+
 /*
   roomClient stores lobby-only information from this browser's point of view.
   It is separate from game state because joining a room and playing a game are
@@ -97,8 +383,10 @@ const roomClient = {
   level: 1,
   maxPlayers: 5,
   isPrivate: false,
+  lobbyView: "rooms",
   nickname: "",
-  hostUserId: null
+  hostUserId: null,
+  pendingPrivateRoomCode: ""
 };
 
 /*
@@ -211,7 +499,81 @@ const els = {
   gameBoard: document.getElementById("gameBoard"),
   lobbyStatus: document.getElementById("lobbyStatus"),
   mainLobbyPanel: document.getElementById("mainLobbyPanel"),
+  rankingPagePanel: document.getElementById("rankingPagePanel"),
   waitingLobbyPanel: document.getElementById("waitingLobbyPanel"),
+  lobbyProfileImage: document.getElementById("lobbyProfileImage"),
+  lobbyNickname: document.getElementById("lobbyNickname"),
+  lobbyRankingPoint: document.getElementById("lobbyRankingPoint"),
+  rankingProfileImage: document.getElementById("rankingProfileImage"),
+  rankingNickname: document.getElementById("rankingNickname"),
+  rankingRankingPoint: document.getElementById("rankingRankingPoint"),
+  rankingStatus: document.getElementById("rankingStatus"),
+  rankingTableBody: document.getElementById("rankingTableBody"),
+  friendsPagePanel: document.getElementById("friendsPagePanel"),
+  friendsProfileImage: document.getElementById("friendsProfileImage"),
+  friendsNickname: document.getElementById("friendsNickname"),
+  friendsRankingPoint: document.getElementById("friendsRankingPoint"),
+  friendsStatus: document.getElementById("friendsStatus"),
+  friendsTableBody: document.getElementById("friendsTableBody"),
+  mailboxLayer: document.getElementById("mailboxLayer"),
+  mailboxStatus: document.getElementById("mailboxStatus"),
+  mailboxNoticeList: document.getElementById("mailboxNoticeList"),
+  leaderBoardsButton: document.getElementById("leaderBoardsButton"),
+  friendsButton: document.getElementById("friendsButton"),
+  mailboxButton: document.getElementById("mailboxButton"),
+  homeButton: document.getElementById("homeButton"),
+  lobbyProfileBox: document.getElementById("lobbyProfileBox"),
+  lobbyProfileMenu: document.getElementById("lobbyProfileMenu"),
+  lobbyUserInfoButton: document.getElementById("lobbyUserInfoButton"),
+  lobbyProfileLogOutButton: document.getElementById("lobbyProfileLogOutButton"),
+  rankingLeaderBoardsButton: document.getElementById("rankingLeaderBoardsButton"),
+  rankingFriendsButton: document.getElementById("rankingFriendsButton"),
+  rankingMailboxButton: document.getElementById("rankingMailboxButton"),
+  rankingHomeButton: document.getElementById("rankingHomeButton"),
+  rankingProfileBox: document.getElementById("rankingProfileBox"),
+  rankingProfileMenu: document.getElementById("rankingProfileMenu"),
+  rankingUserInfoButton: document.getElementById("rankingUserInfoButton"),
+  rankingProfileLogOutButton: document.getElementById("rankingProfileLogOutButton"),
+  friendsLeaderBoardsButton: document.getElementById("friendsLeaderBoardsButton"),
+  friendsFriendsButton: document.getElementById("friendsFriendsButton"),
+  friendsMailboxButton: document.getElementById("friendsMailboxButton"),
+  friendsHomeButton: document.getElementById("friendsHomeButton"),
+  friendsProfileBox: document.getElementById("friendsProfileBox"),
+  friendsProfileMenu: document.getElementById("friendsProfileMenu"),
+  friendsUserInfoButton: document.getElementById("friendsUserInfoButton"),
+  friendsProfileLogOutButton: document.getElementById("friendsProfileLogOutButton"),
+  mailboxCloseButton: document.getElementById("mailboxCloseButton"),
+  addFriendButton: document.getElementById("addFriendButton"),
+  addFriendLayer: document.getElementById("addFriendLayer"),
+  closeAddFriendButton: document.getElementById("closeAddFriendButton"),
+  addFriendNicknameInput: document.getElementById("addFriendNicknameInput"),
+  sendFriendRequestButton: document.getElementById("sendFriendRequestButton"),
+  mailboxDetailLayer: document.getElementById("mailboxDetailLayer"),
+  closeMailboxDetailButton: document.getElementById("closeMailboxDetailButton"),
+  mailboxDetailTitle: document.getElementById("mailboxDetailTitle"),
+  mailboxDetailContent: document.getElementById("mailboxDetailContent"),
+  userInfoLayer: document.getElementById("userInfoLayer"),
+  closeUserInfoButton: document.getElementById("closeUserInfoButton"),
+  userInfoMainImage: document.getElementById("userInfoMainImage"),
+  editProfileImageButton: document.getElementById("editProfileImageButton"),
+  userInfoIdInput: document.getElementById("userInfoIdInput"),
+  userInfoNicknameInput: document.getElementById("userInfoNicknameInput"),
+  userInfoPasswordInput: document.getElementById("userInfoPasswordInput"),
+  userInfoEmailInput: document.getElementById("userInfoEmailInput"),
+  saveUserInfoButton: document.getElementById("saveUserInfoButton"),
+  inviteFriendLayer: document.getElementById("inviteFriendLayer"),
+  closeInviteFriendButton: document.getElementById("closeInviteFriendButton"),
+  inviteFriendStatus: document.getElementById("inviteFriendStatus"),
+  inviteFriendTableBody: document.getElementById("inviteFriendTableBody"),
+  lobbyVolumeButton: document.getElementById("lobbyVolumeButton"),
+  lobbyVolumeSliderWrap: document.getElementById("lobbyVolumeSliderWrap"),
+  lobbyVolumeSlider: document.getElementById("lobbyVolumeSlider"),
+  rankingVolumeButton: document.getElementById("rankingVolumeButton"),
+  rankingVolumeSliderWrap: document.getElementById("rankingVolumeSliderWrap"),
+  rankingVolumeSlider: document.getElementById("rankingVolumeSlider"),
+  friendsVolumeButton: document.getElementById("friendsVolumeButton"),
+  friendsVolumeSliderWrap: document.getElementById("friendsVolumeSliderWrap"),
+  friendsVolumeSlider: document.getElementById("friendsVolumeSlider"),
   roomList: document.getElementById("roomList"),
   openCreateRoomButton: document.getElementById("openCreateRoomButton"),
   createRoomLayer: document.getElementById("createRoomLayer"),
@@ -222,6 +584,10 @@ const els = {
   createRoomCodeInput: document.getElementById("createRoomCodeInput"),
   createLevelSelect: document.getElementById("createLevelSelect"),
   maxPlayersSelect: document.getElementById("maxPlayersSelect"),
+  privateRoomCodeLayer: document.getElementById("privateRoomCodeLayer"),
+  closePrivateRoomCodeButton: document.getElementById("closePrivateRoomCodeButton"),
+  privateRoomCodeInput: document.getElementById("privateRoomCodeInput"),
+  submitPrivateRoomCodeButton: document.getElementById("submitPrivateRoomCodeButton"),
   nicknameInput: document.getElementById("nicknameInput"),
   waitingRoomTitle: document.getElementById("waitingRoomTitle"),
   waitingRoomMeta: document.getElementById("waitingRoomMeta"),
@@ -280,6 +646,20 @@ function isLobbyPhase() {
 function setLobbyStatus(message) {
   // Updates the small lobby status text. The HTML has aria-live, so changes can be announced.
   els.lobbyStatus.textContent = message;
+}
+
+function renderLobbyUser() {
+  // Paint the temporary logged-in user box from mock data.
+  if (els.lobbyProfileImage) els.lobbyProfileImage.src = mockCurrentUser.profileImage;
+  if (els.lobbyNickname) els.lobbyNickname.textContent = mockCurrentUser.nickname;
+  if (els.lobbyRankingPoint) els.lobbyRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
+  if (els.rankingProfileImage) els.rankingProfileImage.src = mockCurrentUser.profileImage;
+  if (els.rankingNickname) els.rankingNickname.textContent = mockCurrentUser.nickname;
+  if (els.rankingRankingPoint) els.rankingRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
+  if (els.friendsProfileImage) els.friendsProfileImage.src = mockCurrentUser.profileImage;
+  if (els.friendsNickname) els.friendsNickname.textContent = mockCurrentUser.nickname;
+  if (els.friendsRankingPoint) els.friendsRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
+  if (els.nicknameInput) els.nicknameInput.value = mockCurrentUser.nickname;
 }
 
 function escapeHtml(value) {
@@ -401,11 +781,137 @@ function renderRoomList() {
   document.querySelectorAll("[data-join-room]").forEach((button) => {
     button.addEventListener("click", () => {
       const privateRoom = button.dataset.private === "true";
-      const roomCode = privateRoom ? window.prompt("Enter room code") : "";
-      if (privateRoom && !roomCode) return;
-      joinRoom(button.dataset.joinRoom, roomCode || "");
+      if (privateRoom) {
+        openPrivateRoomCodeModal(button.dataset.joinRoom);
+        return;
+      }
+      joinRoom(button.dataset.joinRoom, "");
     });
   });
+}
+
+function renderRankingTable() {
+  // Paint the temporary leaderboard table in highest-ranking-point order.
+  if (!els.rankingTableBody) return;
+  els.rankingTableBody.innerHTML = mockLeaderboardUsers
+    .map((user) => user.id === game.localPlayerId
+      ? {
+        ...user,
+        nickname: mockCurrentUser.nickname,
+        rankingPoint: mockCurrentUser.rankingPoint,
+        profileImage: mockCurrentUser.profileImage
+      }
+      : user)
+    .sort((a, b) => b.rankingPoint - a.rankingPoint)
+    .map((user, index) => `
+      <tr class="${user.id === game.localPlayerId ? "is-me" : ""}">
+        <td>${index + 1}</td>
+        <td><img class="ranking-profile-image" src="${user.profileImage}" alt="" /></td>
+        <td>${escapeHtml(user.nickname)}</td>
+        <td>${user.rankingPoint} RP</td>
+      </tr>
+    `).join("");
+}
+
+function renderFriendsTable() {
+  /*
+    Paint the temporary friends table.
+    Unlike the leaderboard, this keeps the stored array order because later-added
+    friends should eventually appear lower in the list.
+  */
+  if (!els.friendsTableBody) return;
+  els.friendsTableBody.innerHTML = mockFriends.map((friend, index) => {
+    const statusClass = friend.online ? "is-online" : "is-offline";
+    const statusText = friend.online ? "Online" : "Offline";
+    return `
+      <tr>
+        <td>${index + 1}</td>
+        <td><img class="friends-profile-image" src="${friend.profileImage}" alt="" /></td>
+        <td>${escapeHtml(friend.nickname)}</td>
+        <td>${friend.rankingPoint} RP</td>
+        <td>
+          <span class="friend-status">
+            <span class="friend-status-dot ${statusClass}" aria-hidden="true"></span>
+            ${statusText}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderMailboxNotices() {
+  // Paint the temporary mailbox notice list.
+  if (!els.mailboxNoticeList) return;
+  if (!mockMailboxNotices.length) {
+    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">No notices.</div>`;
+    return;
+  }
+
+  els.mailboxNoticeList.innerHTML = mockMailboxNotices.map((notice) => `
+    <div class="mailbox-notice-row">
+      <button class="mailbox-message-button" type="button" data-mailbox-open="${escapeHtml(notice.id)}">
+        ${escapeHtml(notice.message)}
+      </button>
+      <button class="mailbox-delete-button" type="button" data-mailbox-delete="${escapeHtml(notice.id)}">Delete</button>
+    </div>
+  `).join("");
+
+  document.querySelectorAll("[data-mailbox-open]").forEach((button) => {
+    button.addEventListener("click", () => openMailboxDetail(button.dataset.mailboxOpen));
+  });
+
+  document.querySelectorAll("[data-mailbox-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteMailboxNotice(button.dataset.mailboxDelete));
+  });
+}
+
+function renderInviteFriendList() {
+  // Paint online mock friends inside the waiting-lobby invite popup.
+  if (!els.inviteFriendTableBody) return;
+  const onlineFriends = mockFriends.filter((friend) => friend.online);
+
+  if (!onlineFriends.length) {
+    els.inviteFriendTableBody.innerHTML = `
+      <tr>
+        <td class="invite-friend-empty" colspan="4">No online friends.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  els.inviteFriendTableBody.innerHTML = onlineFriends.map((friend, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td><img class="invite-friend-profile-image" src="${friend.profileImage}" alt="" /></td>
+      <td>${escapeHtml(friend.nickname)}</td>
+      <td><button class="invite-friend-button" type="button" data-send-game-invite="${escapeHtml(friend.id)}">Invite</button></td>
+    </tr>
+  `).join("");
+
+  document.querySelectorAll("[data-send-game-invite]").forEach((button) => {
+    button.addEventListener("click", () => sendGameInvite(button.dataset.sendGameInvite));
+  });
+}
+
+function openInviteFriendModal() {
+  // Show online friends after the user clicks an empty waiting-room slot.
+  if (!els.inviteFriendLayer) return;
+  renderInviteFriendList();
+  els.inviteFriendLayer.hidden = false;
+  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "Choose an online friend to invite.";
+}
+
+function closeInviteFriendModal() {
+  // Hide the invite-friend popup.
+  if (els.inviteFriendLayer) els.inviteFriendLayer.hidden = true;
+}
+
+function sendGameInvite(friendId) {
+  // Temporary frontend-only behavior until real invite delivery is connected.
+  const friend = mockFriends.find((item) => item.id === friendId);
+  if (!friend) return;
+  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = `Game invite sent to ${friend.nickname}.`;
 }
 
 function renderLobby() {
@@ -421,8 +927,22 @@ function renderLobby() {
   if (!showLobby) return;
 
   const showWaitingLobby = game.phase === "waiting" && roomClient.joined;
-  els.mainLobbyPanel.hidden = showWaitingLobby;
+  const showRankingPage = !showWaitingLobby && roomClient.lobbyView === "ranking";
+  const showFriendsPage = !showWaitingLobby && roomClient.lobbyView === "friends";
+  els.mainLobbyPanel.hidden = showWaitingLobby || showRankingPage || showFriendsPage;
+  els.rankingPagePanel.hidden = !showRankingPage;
+  els.friendsPagePanel.hidden = !showFriendsPage;
   els.waitingLobbyPanel.hidden = !showWaitingLobby;
+
+  if (showRankingPage) {
+    renderRankingTable();
+    return;
+  }
+
+  if (showFriendsPage) {
+    renderFriendsTable();
+    return;
+  }
 
   if (!showWaitingLobby) {
     renderRoomList();
@@ -440,14 +960,24 @@ function renderLobby() {
     innerHTML replaces the whole player-list container with newly generated HTML.
     map(...) creates one HTML string per player; join("") combines them into one string.
   */
-  els.lobbyPlayersList.innerHTML = game.players.length
-    ? game.players.map((player) => `
+  const playerSlots = game.players.map((player) => `
       <div class="lobby-player-item">
         <span>${escapeHtml(player.name)}</span>
         <span class="lobby-player-badge">${player.isHost ? "Host" : "Player"}</span>
       </div>
-    `).join("")
-    : `<div class="lobby-player-item"><span>No players yet</span></div>`;
+    `).join("");
+  const emptySlotCount = Math.max(0, roomClient.maxPlayers - game.players.length);
+  const emptySlots = Array.from({ length: emptySlotCount }, (_, index) => `
+      <div class="lobby-player-item is-empty-slot">
+        <button class="invite-slot-button" type="button" data-open-invite-friends="${index + 1}">Invite Friend</button>
+      </div>
+    `).join("");
+
+  els.lobbyPlayersList.innerHTML = playerSlots + emptySlots;
+
+  document.querySelectorAll("[data-open-invite-friends]").forEach((button) => {
+    button.addEventListener("click", openInviteFriendModal);
+  });
 }
 
 function renderPlayers() {
@@ -901,7 +1431,7 @@ function resetFinalInputs() {
 }
 
 function currentNickname() {
-  return els.nicknameInput.value.trim() || `Player ${localUserId.slice(-4)}`;
+  return mockCurrentUser.nickname || els.nicknameInput.value.trim() || `Player ${localUserId.slice(-4)}`;
 }
 
 function openCreateRoomModal() {
@@ -916,6 +1446,65 @@ function openCreateRoomModal() {
 function closeCreateRoomModal() {
   // Hide the create-room popup without changing the current lobby.
   if (els.createRoomLayer) els.createRoomLayer.hidden = true;
+}
+
+function openPrivateRoomCodeModal(roomCode) {
+  // Show a small code-entry popup before joining a private room.
+  if (!els.privateRoomCodeLayer) return;
+  roomClient.pendingPrivateRoomCode = String(roomCode || "").trim().toUpperCase();
+  els.privateRoomCodeInput.value = "";
+  els.privateRoomCodeLayer.hidden = false;
+  els.privateRoomCodeInput.focus();
+}
+
+function closePrivateRoomCodeModal() {
+  // Hide the private-room code popup and clear the pending room target.
+  if (els.privateRoomCodeLayer) els.privateRoomCodeLayer.hidden = true;
+  roomClient.pendingPrivateRoomCode = "";
+}
+
+function submitPrivateRoomCode() {
+  // Join the selected private room using the code typed into the popup.
+  const privateCode = els.privateRoomCodeInput.value.trim();
+  if (!privateCode) {
+    els.privateRoomCodeInput.focus();
+    setLobbyStatus("Enter the private room code.");
+    return;
+  }
+
+  const roomCode = roomClient.pendingPrivateRoomCode;
+  closePrivateRoomCodeModal();
+  joinRoom(roomCode, privateCode);
+}
+
+function openAddFriendModal() {
+  // Show the small friend-request popup from the Friends page.
+  if (!els.addFriendLayer) return;
+  closeProfileMenus();
+  els.addFriendNicknameInput.value = "";
+  els.addFriendLayer.hidden = false;
+  els.addFriendNicknameInput.focus();
+}
+
+function closeAddFriendModal() {
+  // Hide the add-friend popup without changing the current friends list.
+  if (els.addFriendLayer) els.addFriendLayer.hidden = true;
+}
+
+function sendFriendRequest() {
+  /*
+    Temporary frontend-only behavior.
+    Later this will send the nickname to the backend/DB server.
+  */
+  const nickname = els.addFriendNicknameInput.value.trim();
+  if (!nickname) {
+    els.addFriendNicknameInput.focus();
+    if (els.friendsStatus) els.friendsStatus.textContent = "Enter a user nickname first.";
+    return;
+  }
+
+  closeAddFriendModal();
+  if (els.friendsStatus) els.friendsStatus.textContent = `Friend request sent to ${nickname}.`;
 }
 
 function createRoomFromLobby() {
@@ -964,6 +1553,7 @@ function joinRoom(roomCode, privateCode = "") {
 }
 
 function resetToMainLobby(message = "Choose or create a room.") {
+  clearAllTimers();
   roomClient.joined = false;
   roomClient.roomCode = "";
   roomClient.roomName = "";
@@ -971,10 +1561,251 @@ function resetToMainLobby(message = "Choose or create a room.") {
   roomClient.level = 1;
   roomClient.maxPlayers = 5;
   roomClient.isPrivate = false;
+  roomClient.lobbyView = "rooms";
+  roomClient.pendingPrivateRoomCode = "";
   game.phase = "lobby";
   game.players = [];
+  game.targetColors = [];
+  game.currentSubmission = null;
+  game.turnSubmitted = false;
+  game.selectedChoice = null;
+  game.finalSubmitted = false;
+  game.score = null;
+  game.results = [];
+  els.choiceLayer.hidden = true;
+  els.finalLayer.hidden = true;
+  els.resultLayer.hidden = true;
+  if (els.privateRoomCodeLayer) els.privateRoomCodeLayer.hidden = true;
+  if (els.mailboxLayer) els.mailboxLayer.hidden = true;
+  if (els.mailboxDetailLayer) els.mailboxDetailLayer.hidden = true;
+  if (els.userInfoLayer) els.userInfoLayer.hidden = true;
+  if (els.inviteFriendLayer) els.inviteFriendLayer.hidden = true;
   render();
   setLobbyStatus(message);
+}
+
+function showRankingPage() {
+  // Navigate from the room lobby to the ranking page.
+  roomClient.lobbyView = "ranking";
+  game.phase = "lobby";
+  render();
+  if (els.rankingStatus) els.rankingStatus.textContent = "Highest ranking points first.";
+}
+
+function showFriendsPage() {
+  // Navigate from the room lobby or ranking page to the friends page.
+  roomClient.lobbyView = "friends";
+  game.phase = "lobby";
+  render();
+  if (els.friendsStatus) els.friendsStatus.textContent = "Recently added friends appear lower.";
+}
+
+function openMailboxModal() {
+  // Show the mailbox as a popup on top of the current lobby-style page.
+  if (!els.mailboxLayer) return;
+  closeProfileMenus();
+  renderMailboxNotices();
+  markMailboxAsSeen();
+  els.mailboxLayer.hidden = false;
+  if (els.mailboxStatus) els.mailboxStatus.textContent = "Click a message to read the full notice.";
+}
+
+function closeMailboxModal() {
+  // Hide the mailbox popup and any full-message popup opened from it.
+  if (els.mailboxLayer) els.mailboxLayer.hidden = true;
+  closeMailboxDetail();
+}
+
+function setUserInfoInputsDisabled(disabled) {
+  // Toggle the editable state for every user-info table input.
+  [
+    els.userInfoIdInput,
+    els.userInfoNicknameInput,
+    els.userInfoPasswordInput,
+    els.userInfoEmailInput
+  ].forEach((input) => {
+    if (input) input.disabled = disabled;
+  });
+}
+
+function renderUserInfoPopup() {
+  // Fill the user-info popup from the current mock user.
+  if (!els.userInfoLayer) return;
+  if (els.userInfoMainImage) els.userInfoMainImage.src = mockCurrentUser.profileImage;
+  if (els.userInfoIdInput) els.userInfoIdInput.value = mockCurrentUser.loginId;
+  if (els.userInfoNicknameInput) els.userInfoNicknameInput.value = mockCurrentUser.nickname;
+  if (els.userInfoPasswordInput) els.userInfoPasswordInput.value = mockCurrentUser.password;
+  if (els.userInfoEmailInput) els.userInfoEmailInput.value = mockCurrentUser.email;
+  if (els.saveUserInfoButton) els.saveUserInfoButton.textContent = "Save";
+  setUserInfoInputsDisabled(true);
+}
+
+function openUserInfoModal() {
+  // Show the user-info popup from the profile action menu.
+  if (!els.userInfoLayer) return;
+  closeProfileMenus();
+  renderUserInfoPopup();
+  els.userInfoLayer.hidden = false;
+}
+
+function closeUserInfoModal() {
+  // Hide the user-info popup without saving new edits.
+  if (els.userInfoLayer) els.userInfoLayer.hidden = true;
+}
+
+function enableUserInfoInput(inputId) {
+  // Edit buttons enable one row at a time and focus its input.
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.disabled = false;
+  input.focus();
+  input.select();
+}
+
+function editProfileImage() {
+  // Temporary behavior: generate a fresh mock profile image.
+  const hue = Math.floor(Math.random() * 360);
+  mockCurrentUser.profileImage = createMockProfileImage(mockCurrentUser.nickname, hue);
+  saveMockUser();
+  renderLobbyUser();
+  renderUserInfoPopup();
+}
+
+function saveUserInfoChanges() {
+  /*
+    Save edited mock fields locally.
+    Later this can become a backend request to the real user database.
+  */
+  const nextNickname = els.userInfoNicknameInput.value.trim() || mockCurrentUser.nickname;
+  mockCurrentUser.loginId = els.userInfoIdInput.value.trim() || mockCurrentUser.loginId;
+  mockCurrentUser.nickname = nextNickname;
+  mockCurrentUser.password = els.userInfoPasswordInput.value || mockCurrentUser.password;
+  mockCurrentUser.email = els.userInfoEmailInput.value.trim() || mockCurrentUser.email;
+
+  saveMockUser();
+  renderLobbyUser();
+  renderUserInfoPopup();
+  setUserInfoInputsDisabled(true);
+  if (els.saveUserInfoButton) els.saveUserInfoButton.textContent = "Saved";
+}
+
+function openMailboxDetail(noticeId) {
+  // Show the rich detail popup for one mailbox notice.
+  const notice = mockMailboxNotices.find((item) => item.id === noticeId);
+  if (!notice || !els.mailboxDetailLayer || !els.mailboxDetailContent) return;
+
+  els.mailboxDetailTitle.textContent = notice.type === "friend" ? "Friend Request" : "Game Invite";
+  const roomHtml = notice.type === "invite" && notice.room
+    ? `
+      <div class="mailbox-detail-room" aria-label="Room information">
+        <div class="mailbox-detail-room-row">
+          <span class="mailbox-detail-room-label">Room Name</span>
+          <span>${escapeHtml(notice.room.name)}</span>
+        </div>
+        <div class="mailbox-detail-room-row">
+          <span class="mailbox-detail-room-label">Level</span>
+          <span>${escapeHtml(roomLevelLabel(notice.room.level))}</span>
+        </div>
+        <div class="mailbox-detail-room-row">
+          <span class="mailbox-detail-room-label">Players</span>
+          <span>${notice.room.currentPlayers}/${notice.room.maxPlayers}</span>
+        </div>
+      </div>
+    `
+    : "";
+
+  els.mailboxDetailContent.innerHTML = `
+    <div class="mailbox-detail-user">
+      <img class="mailbox-detail-profile" src="${notice.profileImage}" alt="" />
+      <div class="mailbox-detail-user-text">
+        <div class="mailbox-detail-name">${escapeHtml(notice.sender)}</div>
+        <div class="mailbox-detail-rp">${notice.rankingPoint} RP</div>
+      </div>
+    </div>
+    ${roomHtml}
+    <div class="mailbox-detail-actions">
+      <button class="mailbox-detail-action is-accept" type="button" data-mailbox-response="accept" data-mailbox-response-id="${escapeHtml(notice.id)}">Accept</button>
+      <button class="mailbox-detail-action is-reject" type="button" data-mailbox-response="reject" data-mailbox-response-id="${escapeHtml(notice.id)}">Reject</button>
+    </div>
+  `;
+
+  document.querySelectorAll("[data-mailbox-response]").forEach((button) => {
+    button.addEventListener("click", () => {
+      handleMailboxResponse(button.dataset.mailboxResponseId, button.dataset.mailboxResponse);
+    });
+  });
+
+  els.mailboxDetailLayer.hidden = false;
+}
+
+function closeMailboxDetail() {
+  // Hide the full-message popup.
+  if (els.mailboxDetailLayer) els.mailboxDetailLayer.hidden = true;
+}
+
+function handleMailboxResponse(noticeId, response) {
+  // Temporary frontend-only accept/reject behavior until backend actions exist.
+  const notice = mockMailboxNotices.find((item) => item.id === noticeId);
+  if (!notice) return;
+  const actionText = response === "accept" ? "Accepted" : "Rejected";
+  const targetText = notice.type === "friend" ? "friend request" : "game invite";
+  mockMailboxNotices = mockMailboxNotices.filter((item) => item.id !== noticeId);
+  saveMockMailboxNotices();
+  updateMailboxUnreadDots();
+  closeMailboxDetail();
+  renderMailboxNotices();
+  if (els.mailboxStatus) els.mailboxStatus.textContent = `${actionText} ${targetText} from ${notice.sender}.`;
+}
+
+function deleteMailboxNotice(noticeId) {
+  // Remove one temporary notice and persist that deletion for this browser session.
+  mockMailboxNotices = mockMailboxNotices.filter((notice) => notice.id !== noticeId);
+  saveMockMailboxNotices();
+  updateMailboxUnreadDots();
+  closeMailboxDetail();
+  renderMailboxNotices();
+  if (els.mailboxStatus) els.mailboxStatus.textContent = "Notice deleted.";
+}
+
+function showMainLobbyPage(message = "Choose or create a room.") {
+  // Navigate back to the main room list from a lobby subpage.
+  roomClient.lobbyView = "rooms";
+  game.phase = "lobby";
+  render();
+  setLobbyStatus(message);
+}
+
+function closeProfileMenus(exceptMenu = null) {
+  /*
+    Hide profile action menus.
+    exceptMenu is used when opening one menu so the chosen menu stays open while
+    the other profile menus close.
+  */
+  [
+    [els.lobbyProfileBox, els.lobbyProfileMenu],
+    [els.rankingProfileBox, els.rankingProfileMenu],
+    [els.friendsProfileBox, els.friendsProfileMenu]
+  ].forEach(([box, menu]) => {
+    if (!box || !menu || menu === exceptMenu) return;
+    menu.hidden = true;
+    box.setAttribute("aria-expanded", "false");
+  });
+}
+
+function toggleProfileMenu(box, menu) {
+  // Open the clicked profile menu, or close it if it is already open.
+  if (!box || !menu) return;
+  const shouldOpen = menu.hidden;
+  closeProfileMenus(shouldOpen ? menu : null);
+  menu.hidden = !shouldOpen;
+  box.setAttribute("aria-expanded", String(shouldOpen));
+}
+
+function setLobbyPageMessage(message) {
+  // Update status text for whichever lobby-style page is visible now.
+  setLobbyStatus(message);
+  if (els.rankingStatus) els.rankingStatus.textContent = message;
+  if (els.friendsStatus) els.friendsStatus.textContent = message;
 }
 
 function leaveRoom() {
@@ -1273,13 +2104,165 @@ function handleGameOver(data) {
   These listeners connect user actions in the browser to the functions above.
   addEventListener("click", fn) means "run fn when this element is clicked."
 */
-els.nicknameInput.value = `Player ${localUserId.slice(-4)}`;
+renderLobbyUser();
+updateMailboxUnreadDots();
 els.openCreateRoomButton.addEventListener("click", openCreateRoomModal);
 els.closeCreateRoomButton.addEventListener("click", closeCreateRoomModal);
 els.cancelCreateRoomButton.addEventListener("click", closeCreateRoomModal);
 els.createRoomButton.addEventListener("click", createRoomFromLobby);
+els.closePrivateRoomCodeButton.addEventListener("click", closePrivateRoomCodeModal);
+els.submitPrivateRoomCodeButton.addEventListener("click", submitPrivateRoomCode);
 els.leaveRoomButton.addEventListener("click", leaveRoom);
 els.startGameButton.addEventListener("click", startGameFromLobby);
+els.leaderBoardsButton.addEventListener("click", showRankingPage);
+els.friendsButton.addEventListener("click", showFriendsPage);
+els.mailboxButton.addEventListener("click", openMailboxModal);
+els.rankingFriendsButton.addEventListener("click", showFriendsPage);
+els.rankingMailboxButton.addEventListener("click", openMailboxModal);
+els.friendsLeaderBoardsButton.addEventListener("click", showRankingPage);
+els.friendsMailboxButton.addEventListener("click", openMailboxModal);
+els.rankingHomeButton.addEventListener("click", () => showMainLobbyPage());
+els.friendsHomeButton.addEventListener("click", () => showMainLobbyPage());
+els.mailboxCloseButton.addEventListener("click", closeMailboxModal);
+
+[
+  [els.lobbyProfileBox, els.lobbyProfileMenu],
+  [els.rankingProfileBox, els.rankingProfileMenu],
+  [els.friendsProfileBox, els.friendsProfileMenu]
+].forEach(([box, menu]) => {
+  if (!box || !menu) return;
+
+  box.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleProfileMenu(box, menu);
+  });
+
+  box.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggleProfileMenu(box, menu);
+  });
+
+  menu.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+});
+
+document.addEventListener("click", () => {
+  closeProfileMenus();
+});
+
+[
+  els.lobbyUserInfoButton,
+  els.rankingUserInfoButton,
+  els.friendsUserInfoButton
+].forEach((button) => {
+  if (!button) return;
+  button.addEventListener("click", () => {
+    openUserInfoModal();
+  });
+});
+
+[
+  els.lobbyProfileLogOutButton,
+  els.rankingProfileLogOutButton,
+  els.friendsProfileLogOutButton
+].forEach((button) => {
+  if (!button) return;
+  button.addEventListener("click", () => {
+    closeProfileMenus();
+    const message = "Log out flow will be connected after the guest lobby is built.";
+    setLobbyPageMessage(message);
+  });
+});
+
+if (els.addFriendButton) {
+  els.addFriendButton.addEventListener("click", openAddFriendModal);
+}
+
+if (els.privateRoomCodeInput) {
+  els.privateRoomCodeInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    submitPrivateRoomCode();
+  });
+}
+
+if (els.privateRoomCodeLayer) {
+  els.privateRoomCodeLayer.addEventListener("click", (event) => {
+    if (event.target === els.privateRoomCodeLayer) closePrivateRoomCodeModal();
+  });
+}
+
+if (els.closeAddFriendButton) {
+  els.closeAddFriendButton.addEventListener("click", closeAddFriendModal);
+}
+
+if (els.sendFriendRequestButton) {
+  els.sendFriendRequestButton.addEventListener("click", sendFriendRequest);
+}
+
+if (els.addFriendNicknameInput) {
+  els.addFriendNicknameInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    sendFriendRequest();
+  });
+}
+
+if (els.addFriendLayer) {
+  els.addFriendLayer.addEventListener("click", (event) => {
+    if (event.target === els.addFriendLayer) closeAddFriendModal();
+  });
+}
+
+if (els.mailboxLayer) {
+  els.mailboxLayer.addEventListener("click", (event) => {
+    if (event.target === els.mailboxLayer) closeMailboxModal();
+  });
+}
+
+if (els.closeMailboxDetailButton) {
+  els.closeMailboxDetailButton.addEventListener("click", closeMailboxDetail);
+}
+
+if (els.mailboxDetailLayer) {
+  els.mailboxDetailLayer.addEventListener("click", (event) => {
+    if (event.target === els.mailboxDetailLayer) closeMailboxDetail();
+  });
+}
+
+if (els.closeUserInfoButton) {
+  els.closeUserInfoButton.addEventListener("click", closeUserInfoModal);
+}
+
+if (els.userInfoLayer) {
+  els.userInfoLayer.addEventListener("click", (event) => {
+    if (event.target === els.userInfoLayer) closeUserInfoModal();
+  });
+}
+
+document.querySelectorAll("[data-user-info-edit]").forEach((button) => {
+  button.addEventListener("click", () => enableUserInfoInput(button.dataset.userInfoEdit));
+});
+
+if (els.editProfileImageButton) {
+  els.editProfileImageButton.addEventListener("click", editProfileImage);
+}
+
+if (els.saveUserInfoButton) {
+  els.saveUserInfoButton.addEventListener("click", saveUserInfoChanges);
+}
+
+if (els.closeInviteFriendButton) {
+  els.closeInviteFriendButton.addEventListener("click", closeInviteFriendModal);
+}
+
+if (els.inviteFriendLayer) {
+  els.inviteFriendLayer.addEventListener("click", (event) => {
+    if (event.target === els.inviteFriendLayer) closeInviteFriendModal();
+  });
+}
 
 // if (els.guideButton && els.guidePopover) {
 //   // Optional guide popup support. The current HTML may not include these elements.
@@ -1300,6 +2283,33 @@ if (els.volumeButton && els.volumeSliderWrap) {
     const nextOpen = els.volumeSliderWrap.hidden;
     els.volumeSliderWrap.hidden = !nextOpen;
     els.volumeButton.setAttribute("aria-expanded", String(nextOpen));
+  });
+}
+
+if (els.lobbyVolumeButton && els.lobbyVolumeSliderWrap) {
+  // Lobby volume uses its own vertical slider above the button.
+  els.lobbyVolumeButton.addEventListener("click", () => {
+    const nextOpen = els.lobbyVolumeSliderWrap.hidden;
+    els.lobbyVolumeSliderWrap.hidden = !nextOpen;
+    els.lobbyVolumeButton.setAttribute("aria-expanded", String(nextOpen));
+  });
+}
+
+if (els.rankingVolumeButton && els.rankingVolumeSliderWrap) {
+  // Ranking page volume uses the same vertical slider pattern as the lobby.
+  els.rankingVolumeButton.addEventListener("click", () => {
+    const nextOpen = els.rankingVolumeSliderWrap.hidden;
+    els.rankingVolumeSliderWrap.hidden = !nextOpen;
+    els.rankingVolumeButton.setAttribute("aria-expanded", String(nextOpen));
+  });
+}
+
+if (els.friendsVolumeButton && els.friendsVolumeSliderWrap) {
+  // Friends page volume uses the same vertical slider pattern as the lobby.
+  els.friendsVolumeButton.addEventListener("click", () => {
+    const nextOpen = els.friendsVolumeSliderWrap.hidden;
+    els.friendsVolumeSliderWrap.hidden = !nextOpen;
+    els.friendsVolumeButton.setAttribute("aria-expanded", String(nextOpen));
   });
 }
 
@@ -1330,8 +2340,8 @@ els.submitFinalButton.addEventListener("click", () => {
 });
 
 els.closeResult.addEventListener("click", () => {
-  // Hide the result popup after the user is done reading it.
-  els.resultLayer.hidden = true;
+  // After results are read, return this browser to the main lobby.
+  resetToMainLobby("Choose or create a room.");
 });
 
 els.exitButton.addEventListener("click", () => {
