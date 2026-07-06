@@ -92,6 +92,11 @@ sessionStorage.setItem("colorMasterUserId", localUserId);
 const roomClient = {
   joined: false,
   roomCode: "",
+  roomName: "",
+  rooms: [],
+  level: 1,
+  maxPlayers: 5,
+  isPrivate: false,
   nickname: "",
   hostUserId: null
 };
@@ -204,10 +209,22 @@ const els = {
   lobbyScreen: document.getElementById("lobbyScreen"),
   gameBoard: document.getElementById("gameBoard"),
   lobbyStatus: document.getElementById("lobbyStatus"),
-  roomCodeInput: document.getElementById("roomCodeInput"),
+  mainLobbyPanel: document.getElementById("mainLobbyPanel"),
+  waitingLobbyPanel: document.getElementById("waitingLobbyPanel"),
+  roomList: document.getElementById("roomList"),
+  openCreateRoomButton: document.getElementById("openCreateRoomButton"),
+  createRoomLayer: document.getElementById("createRoomLayer"),
+  closeCreateRoomButton: document.getElementById("closeCreateRoomButton"),
+  cancelCreateRoomButton: document.getElementById("cancelCreateRoomButton"),
+  createRoomButton: document.getElementById("createRoomButton"),
+  createRoomNameInput: document.getElementById("createRoomNameInput"),
+  createRoomCodeInput: document.getElementById("createRoomCodeInput"),
+  createLevelSelect: document.getElementById("createLevelSelect"),
+  maxPlayersSelect: document.getElementById("maxPlayersSelect"),
   nicknameInput: document.getElementById("nicknameInput"),
-  levelSelect: document.getElementById("levelSelect"),
-  joinRoomButton: document.getElementById("joinRoomButton"),
+  waitingRoomTitle: document.getElementById("waitingRoomTitle"),
+  waitingRoomMeta: document.getElementById("waitingRoomMeta"),
+  leaveRoomButton: document.getElementById("leaveRoomButton"),
   startGameButton: document.getElementById("startGameButton"),
   lobbyPlayersList: document.getElementById("lobbyPlayersList"),
   roundLabel: document.getElementById("roundLabel"),
@@ -262,6 +279,21 @@ function isLobbyPhase() {
 function setLobbyStatus(message) {
   // Updates the small lobby status text. The HTML has aria-live, so changes can be announced.
   els.lobbyStatus.textContent = message;
+}
+
+function escapeHtml(value) {
+  /*
+    Text typed by users, such as room names and nicknames, should be displayed
+    as text only. This replaces HTML-sensitive characters so a typed name cannot
+    accidentally become real HTML inside innerHTML.
+  */
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#039;"
+  }[character]));
 }
 
 function rgb(color) {
@@ -326,18 +358,81 @@ function currentTitle() {
   return `${activePlayer().name}'s Turn`;
 }
 
+function roomLevelLabel(level) {
+  const count = Number(level) || 1;
+  return `${count} color${count === 1 ? "" : "s"}`;
+}
+
+function renderRoomList() {
+  /*
+    Main lobby room list.
+    The server sends only rooms that are still waiting. Each row gets a Join
+    button; private rooms ask for their room code before emitting join_room.
+  */
+  const rooms = roomClient.rooms || [];
+  if (!rooms.length) {
+    els.roomList.innerHTML = `<div class="room-empty">No waiting rooms yet.</div>`;
+    return;
+  }
+
+  els.roomList.innerHTML = `
+    <div class="room-list-header" aria-hidden="true">
+      <span>No.</span>
+      <span>Name</span>
+      <span>Level</span>
+      <span>Players</span>
+      <span></span>
+    </div>
+    ${rooms.map((room, index) => {
+      const isFull = room.playerCount >= room.maxPlayers;
+      return `
+        <div class="room-row">
+          <span>${index + 1}</span>
+          <span class="room-name">${escapeHtml(room.roomName)}${room.isPrivate ? `<span class="room-private-mark">(P)</span>` : ""}</span>
+          <span>${roomLevelLabel(room.level)}</span>
+          <span>${room.playerCount}/${room.maxPlayers}</span>
+          <button class="room-join-button" type="button" data-join-room="${escapeHtml(room.roomCode)}" data-private="${room.isPrivate ? "true" : "false"}" ${isFull ? "disabled" : ""}>Join</button>
+        </div>
+      `;
+    }).join("")}
+  `;
+
+  document.querySelectorAll("[data-join-room]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const privateRoom = button.dataset.private === "true";
+      const roomCode = privateRoom ? window.prompt("Enter room code") : "";
+      if (privateRoom && !roomCode) return;
+      joinRoom(button.dataset.joinRoom, roomCode || "");
+    });
+  });
+}
+
 function renderLobby() {
   /*
     Show or hide the lobby and game board.
-    The HTML has both screens in the document; this function decides which one
-    is visible by setting the hidden property.
+    The lobby itself now has two sub-screens:
+    - main lobby: list of waiting rooms
+    - waiting lobby: players inside one joined room
   */
   const showLobby = isLobbyPhase();
   els.lobbyScreen.hidden = !showLobby;
   els.gameBoard.hidden = showLobby;
+  if (!showLobby) return;
 
-  // Only a joined host with at least two players can start the game.
+  const showWaitingLobby = game.phase === "waiting" && roomClient.joined;
+  els.mainLobbyPanel.hidden = showWaitingLobby;
+  els.waitingLobbyPanel.hidden = !showWaitingLobby;
+
+  if (!showWaitingLobby) {
+    renderRoomList();
+    return;
+  }
+
   const isHost = roomClient.hostUserId === game.localPlayerId;
+  const privateMark = roomClient.isPrivate ? " (P)" : "";
+  els.waitingRoomTitle.textContent = `${roomClient.roomName || "Waiting Room"}${privateMark}`;
+  els.waitingRoomMeta.textContent = `${roomLevelLabel(roomClient.level)} | ${game.players.length}/${roomClient.maxPlayers} players`;
+  els.startGameButton.hidden = !isHost;
   els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 2;
 
   /*
@@ -347,7 +442,7 @@ function renderLobby() {
   els.lobbyPlayersList.innerHTML = game.players.length
     ? game.players.map((player) => `
       <div class="lobby-player-item">
-        <span>${player.name}</span>
+        <span>${escapeHtml(player.name)}</span>
         <span class="lobby-player-badge">${player.isHost ? "Host" : "Player"}</span>
       </div>
     `).join("")
@@ -597,7 +692,7 @@ function render() {
 
   els.roundLabel.textContent = `Round ${Math.min(game.currentRound, TOTAL_ROUNDS)}`;
   els.timerNumber.textContent = game.phase === "choosing" ? game.choiceSeconds : game.turnSeconds;
-  els.timerCaption.textContent = game.phase === "choosing" ? "PICK" : "TIME";
+  els.timerCaption.textContent = game.phase === "choosing" ? "PICK" : "SECONDS";
   if (els.choicePopupTime) els.choicePopupTime.textContent = game.choiceSeconds;
   if (els.finalPopupTime) els.finalPopupTime.textContent = game.turnSeconds;
   renderTargetImage();
@@ -769,39 +864,101 @@ function resetFinalInputs() {
   });
 }
 
-// 아마 수정해야 할듯
-function joinRoom() {
+function currentNickname() {
+  return els.nicknameInput.value.trim() || `Player ${localUserId.slice(-4)}`;
+}
+
+function openCreateRoomModal() {
+  // Show the create-room popup and provide a friendly default room name.
+  if (!els.createRoomLayer) return;
+  els.createRoomNameInput.value = `${currentNickname()}'s room`;
+  els.createRoomCodeInput.value = "";
+  els.createRoomLayer.hidden = false;
+  els.createRoomNameInput.focus();
+}
+
+function closeCreateRoomModal() {
+  // Hide the create-room popup without changing the current lobby.
+  if (els.createRoomLayer) els.createRoomLayer.hidden = true;
+}
+
+function createRoomFromLobby() {
   /*
-    Called when the user clicks Join Room.
-    It reads lobby inputs, stores them in roomClient, and emits join_room to
-    the Socket.IO server.
+    Called when the user confirms the create-room popup.
+    A blank room code creates a public room. A non-blank room code creates a
+    private room that other users must enter before joining.
   */
   if (!socket) {
     setLobbyStatus("Open this page through the Node server to use rooms.");
     return;
   }
 
-  roomClient.roomCode = els.roomCodeInput.value.trim().toUpperCase() || "ROOM_777";
-  roomClient.nickname = els.nicknameInput.value.trim() || `Player ${localUserId.slice(-4)}`;
-  roomClient.joined = true;
-  socket.emit("join_room", {
-    roomCode: roomClient.roomCode,
+  roomClient.nickname = currentNickname();
+  socket.emit("create_room", {
+    roomName: els.createRoomNameInput.value.trim(),
+    roomCode: els.createRoomCodeInput.value.trim(),
+    level: Number(els.createLevelSelect.value),
+    maxPlayers: Number(els.maxPlayersSelect.value),
     userId: game.localPlayerId,
     nickname: roomClient.nickname
   });
-  setLobbyStatus(`Joining ${roomClient.roomCode}...`);
-
-  // Render immediately for responsiveness; the server will send an official update soon.
-  renderLobby();
+  setLobbyStatus("Creating room...");
 }
 
-// 아마 수정해야 할듯
+function joinRoom(roomCode, privateCode = "") {
+  /*
+    Called when the user clicks a Join button in the room list.
+    roomCode identifies the listed room. privateCode is only filled for rooms
+    marked (P).
+  */
+  if (!socket) {
+    setLobbyStatus("Open this page through the Node server to use rooms.");
+    return;
+  }
+
+  roomClient.roomCode = String(roomCode || "").trim().toUpperCase();
+  roomClient.nickname = currentNickname();
+  socket.emit("join_room", {
+    roomCode: roomClient.roomCode,
+    privateCode,
+    userId: game.localPlayerId,
+    nickname: roomClient.nickname
+  });
+  setLobbyStatus("Joining room...");
+}
+
+function resetToMainLobby(message = "Choose or create a room.") {
+  roomClient.joined = false;
+  roomClient.roomCode = "";
+  roomClient.roomName = "";
+  roomClient.hostUserId = null;
+  roomClient.level = 1;
+  roomClient.maxPlayers = 5;
+  roomClient.isPrivate = false;
+  game.phase = "lobby";
+  game.players = [];
+  render();
+  setLobbyStatus(message);
+}
+
+function leaveRoom() {
+  // Leave the waiting lobby and return to the main room list.
+  if (!socket || !roomClient.joined) {
+    resetToMainLobby();
+    return;
+  }
+
+  socket.emit("leave_room", {
+    roomCode: roomClient.roomCode
+  });
+  resetToMainLobby("Leaving room...");
+}
+
 function startGameFromLobby() {
-  // Called when the host clicks Start Game.
+  // Called when the host clicks Start Game in the waiting lobby.
   if (!socket || !roomClient.joined) return;
   socket.emit("start_game", {
-    roomCode: roomClient.roomCode,
-    level: Number(els.levelSelect.value)
+    roomCode: roomClient.roomCode
   });
 }
 
@@ -875,6 +1032,15 @@ function submitFinalAnswer(autoSubmit = false) {
   els.submitFinalButton.disabled = true;
 }
 
+function handleRoomList(data) {
+  /*
+    Server event: room_list.
+    This is the main lobby list of rooms that are currently waiting for players.
+  */
+  roomClient.rooms = data?.rooms || [];
+  if (game.phase === "lobby") renderLobby();
+}
+
 // 얘도 수정해야 할듯
 function handleRoomUpdate(data) {
   /*
@@ -884,6 +1050,10 @@ function handleRoomUpdate(data) {
   */
   roomClient.hostUserId = data.hostUserId;
   roomClient.roomCode = data.roomCode;
+  roomClient.roomName = data.roomName || "Waiting Room";
+  roomClient.level = Number(data.level) || 1;
+  roomClient.maxPlayers = Number(data.maxPlayers) || 5;
+  roomClient.isPrivate = Boolean(data.isPrivate);
   game.players = playersFromServer(data.players || []);
   if (data.phase === "PEEKING") {
     game.responseMarks = new Set(
@@ -896,8 +1066,9 @@ function handleRoomUpdate(data) {
   if (data.phase === "WAITING") {
     game.phase = "waiting";
     roomClient.joined = game.players.some((player) => player.id === game.localPlayerId);
+    closeCreateRoomModal();
     setLobbyStatus(roomClient.joined
-      ? `Room ${data.roomCode} is waiting.`
+      ? `Room ${roomClient.roomName} is waiting.`
       : "Join a room to play.");
   }
 
@@ -1065,7 +1236,11 @@ function handleGameOver(data) {
   addEventListener("click", fn) means "run fn when this element is clicked."
 */
 els.nicknameInput.value = `Player ${localUserId.slice(-4)}`;
-els.joinRoomButton.addEventListener("click", joinRoom);
+els.openCreateRoomButton.addEventListener("click", openCreateRoomModal);
+els.closeCreateRoomButton.addEventListener("click", closeCreateRoomModal);
+els.cancelCreateRoomButton.addEventListener("click", closeCreateRoomModal);
+els.createRoomButton.addEventListener("click", createRoomFromLobby);
+els.leaveRoomButton.addEventListener("click", leaveRoom);
 els.startGameButton.addEventListener("click", startGameFromLobby);
 
 // if (els.guideButton && els.guidePopover) {
@@ -1140,6 +1315,7 @@ if (PREVIEW_GAME_SCREEN) {
   // 수정 예정
   socket.on("connect", () => {
     setLobbyStatus("Connected. Join or create a room.");
+    socket.emit("request_room_list");
   });
 
   socket.on("disconnect", () => {
@@ -1157,6 +1333,8 @@ if (PREVIEW_GAME_SCREEN) {
   });
 
   // Game-specific events sent by server.js.
+  socket.on("room_list", handleRoomList);
+  socket.on("left_room", () => resetToMainLobby("Choose or create a room."));
   socket.on("room_update", handleRoomUpdate);
   socket.on("round_start", handleRoundStart);
   socket.on("turn_start", handleTurnStart);

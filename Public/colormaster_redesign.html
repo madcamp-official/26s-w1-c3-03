@@ -43,45 +43,82 @@
         <!-- aria-live="polite" tells screen readers to announce text changes here without interrupting. -->
         <p class="lobby-status" id="lobbyStatus" aria-live="polite">Connect to the server, then join a room.</p>
 
-        <!-- The lobby form contains the inputs needed before joining or starting a game. -->
-        <div class="lobby-form">
-          <!-- A <label> connects visible text with an input, making the field easier to click and understand. -->
-          <label class="lobby-field">
-            <span>Room Code</span>
-            <!-- id lets JavaScript find this exact input; value provides a default room code. -->
-            <input id="roomCodeInput" type="text" value="ROOM_777" autocomplete="off" />
-          </label>
-          <label class="lobby-field">
+        <!-- Main lobby: shows rooms that have been created and are still waiting. -->
+        <section class="main-lobby-panel" id="mainLobbyPanel" aria-label="Waiting rooms">
+          <label class="lobby-field lobby-nickname-field">
             <span>Nickname</span>
             <input id="nicknameInput" type="text" autocomplete="off" />
           </label>
-          <label class="lobby-field">
-            <span>Image Colors</span>
-            <!-- <select> creates a dropdown; each <option> is one possible value sent to JavaScript. -->
-            <select id="levelSelect">
-              <option value="1">1 color</option>
-              <option value="2">2 colors</option>
-              <option value="3">3 colors</option>
-              <option value="4">4 colors</option>
-            </select>
-          </label>
-        </div>
 
-        <!-- Buttons use type="button" so they do not accidentally submit a form or reload the page. -->
-        <div class="lobby-actions">
-          <button class="lobby-button" id="joinRoomButton" type="button">Join Room</button>
-          <!-- disabled means the button starts inactive; JavaScript enables it when the user is allowed to start. -->
-          <button class="lobby-button" id="startGameButton" type="button" disabled>Start Game</button>
-        </div>
-
-        <section class="lobby-players" aria-label="Players waiting in room">
-          <div class="panel-heading">
-            <span>Players</span>
-            <small>Waiting room</small>
+          <div class="lobby-toolbar">
+            <h3 class="lobby-section-title">Waiting Rooms</h3>
+            <button class="lobby-button" id="openCreateRoomButton" type="button">Create a room</button>
           </div>
+
+          <!-- Empty on purpose: JavaScript fills this with the current room list. -->
+          <div class="room-list" id="roomList" aria-label="Currently waiting rooms"></div>
+        </section>
+
+        <!-- Waiting lobby: shown after this browser joins one room. -->
+        <section class="waiting-lobby-panel" id="waitingLobbyPanel" aria-label="Players waiting in room" hidden>
+          <div class="waiting-header">
+            <div>
+              <h3 class="lobby-section-title" id="waitingRoomTitle">Waiting Room</h3>
+              <p class="waiting-room-meta" id="waitingRoomMeta"></p>
+            </div>
+            <button class="lobby-button lobby-button-secondary" id="leaveRoomButton" type="button">Leave</button>
+          </div>
+
           <!-- Empty on purpose: JavaScript fills this with the current waiting players. -->
           <div class="lobby-player-list" id="lobbyPlayersList"></div>
+
+          <!-- JavaScript shows this only for the host and enables it when at least two players are present. -->
+          <button class="lobby-button" id="startGameButton" type="button" disabled hidden>Start Game</button>
         </section>
+      </div>
+
+      <!-- Create-room popup. It is hidden until the user clicks "Create a room". -->
+      <div class="create-room-layer" id="createRoomLayer" hidden>
+        <div class="create-room-panel" role="dialog" aria-modal="true" aria-labelledby="createRoomTitle">
+          <div class="create-room-header">
+            <h3 class="lobby-section-title" id="createRoomTitle">Create Room</h3>
+            <button class="popup-close" id="closeCreateRoomButton" type="button" aria-label="Close create room">x</button>
+          </div>
+
+          <div class="create-room-form">
+            <label class="lobby-field">
+              <span>Room Name</span>
+              <input id="createRoomNameInput" type="text" autocomplete="off" maxlength="32" />
+            </label>
+            <label class="lobby-field">
+              <span>Room Code (optional)</span>
+              <input id="createRoomCodeInput" type="text" autocomplete="off" maxlength="18" />
+            </label>
+            <label class="lobby-field">
+              <span>Room Level</span>
+              <select id="createLevelSelect">
+                <option value="1">1 color</option>
+                <option value="2">2 colors</option>
+                <option value="3">3 colors</option>
+                <option value="4">4 colors</option>
+              </select>
+            </label>
+            <label class="lobby-field">
+              <span>Players</span>
+              <select id="maxPlayersSelect">
+                <option value="2">2 players</option>
+                <option value="3">3 players</option>
+                <option value="4">4 players</option>
+                <option value="5">5 players</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="lobby-actions">
+            <button class="lobby-button" id="createRoomButton" type="button">Create Room</button>
+            <button class="lobby-button lobby-button-secondary" id="cancelCreateRoomButton" type="button">Close</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -96,7 +133,7 @@
 
       <!-- Exit button. The image is decorative, so alt="" avoids duplicate screen-reader text. -->
       <button class="exit-button" id="exitButton" type="button" aria-label="나가기">
-        <img class="exit-icon" src="exit_icon.png" alt="" />
+        <img class="exit-icon" src="/Images/exit_icon.png" alt="" />
       </button>
 
       <!-- Volume control placeholder: the slider UI is wired now; real audio control can be added later. -->
@@ -107,7 +144,7 @@
         </div>
         <!-- aria-expanded describes whether the button's related control is currently open. -->
         <button class="volume-button" id="volumeButton" type="button" aria-label="볼륨 조절" aria-expanded="false">
-          <img class="volume-icon" src="volume_icon.png" alt="" />
+          <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
         </button>
       </div>
 
@@ -174,7 +211,7 @@
           <div class="panel-heading">
             <span>Color Guide</span>
           </div>
-          <img class="guide-image" src="rgb_guide.png" alt="RGB 색상 가이드" />
+          <img class="guide-image" src="/Images/rgb_guide.png" alt="RGB 색상 가이드" />
         </section>
 
         <!-- Static legend explaining how error distance maps to feedback colors. -->
@@ -202,7 +239,7 @@
         <div class="choice-card" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
           <div class="choice-popup-timer" aria-live="polite">
             <span class="choice-popup-time" id="choicePopupTime">10</span>
-            <span class="choice-popup-caption">TIME</span>
+            <span class="choice-popup-caption">SECONDS</span>
           </div>
           <button class="choice-close" id="closeChoice" type="button" aria-label="선택창 닫기">×</button>
           <p class="modal-kicker">PEEK PHASE</p>
@@ -217,7 +254,7 @@
         <div class="final-modal" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
           <div class="final-popup-timer" aria-live="polite">
             <span class="final-popup-time" id="finalPopupTime">30</span>
-            <span class="final-popup-caption">TIME</span>
+            <span class="final-popup-caption">SECONDS</span>
           </div>
           <p class="modal-kicker">FINAL GUESS</p>
           <h4 class="final-title" id="finalTitle">최종 답안</h4>

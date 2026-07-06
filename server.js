@@ -49,6 +49,7 @@ const CONFIG = {
   PEEK_TIME_MS: 10000,
   FINAL_TIME_MS: 30000,
   MIN_PLAYERS_TO_START: 2,
+  MAX_PLAYERS_PER_ROOM: 5,
 
   /*
     POINTS maps player count -> points by final rank.
@@ -73,13 +74,28 @@ const CONFIG = {
 */
 const activeRooms = new Map();
 
-// Serve files in this folder directly, such as CSS, JS, and images.
-app.use(express.static(__dirname));
+/*
+  Static file folders after the project hierarchy change:
+  - Public contains browser files such as HTML, CSS, and frontend JS.
+  - Images contains PNG assets used by the HTML.
+
+  app.use(express.static(PUBLIC_DIR)) lets the browser request:
+  /colormaster_redesign.css
+  /colormaster_redesign.js
+
+  app.use("/Images", express.static(IMAGE_DIR)) lets the browser request:
+  /Images/exit_icon.png
+*/
+const PUBLIC_DIR = path.join(__dirname, "Public");
+const IMAGE_DIR = path.join(__dirname, "Images");
 
 // When the user opens http://localhost:3000/, send the main game HTML.
 app.get("/", (_req, res) => {
-  res.sendFile(path.join(__dirname, "colormaster_redesign.html"));
+  res.sendFile(path.join(PUBLIC_DIR, "colormaster_redesign.html"));
 });
+
+app.use(express.static(PUBLIC_DIR));
+app.use("/Images", express.static(IMAGE_DIR));
 
 function clamp(value, min, max) {
   // Restrict a number so it cannot go below min or above max.
@@ -89,15 +105,50 @@ function clamp(value, min, max) {
 function normalizeRoomCode(roomCode) {
   /*
     Room codes should be consistent even if the user types lowercase text or
-    extra spaces. Empty input falls back to the default room.
+    extra spaces.
   */
-  return String(roomCode || "").trim().toUpperCase() || "ROOM_777";
+  return String(roomCode || "").trim().toUpperCase();
 }
 
 // 수정 필요, 나중에 필요없을 수도?
 function normalizeNickname(nickname) {
   // Keep names short enough for the UI and provide a fallback for empty names.
   return String(nickname || "").trim().slice(0, 18) || "Player";
+}
+
+function normalizeRoomName(roomName, fallbackName) {
+  // Keep room names short enough for the lobby list.
+  return String(roomName || "").trim().slice(0, 32) || fallbackName;
+}
+
+function normalizeOptionalRoomCode(roomCode) {
+  /*
+    The optional create-room code is the private-room password.
+    Empty string means the room is public.
+  */
+  return String(roomCode || "").trim().toUpperCase().slice(0, 18);
+}
+
+function normalizeLevel(level) {
+  // Level is currently the number of colors shown in the target image.
+  return clamp(Math.floor(Number(level)) || 1, 1, 4);
+}
+
+function normalizeMaxPlayers(maxPlayers) {
+  // Scoring is configured for 2 to 5 players, so room capacity stays there.
+  return clamp(Math.floor(Number(maxPlayers)) || CONFIG.MAX_PLAYERS_PER_ROOM, CONFIG.MIN_PLAYERS_TO_START, CONFIG.MAX_PLAYERS_PER_ROOM);
+}
+
+function generateRoomCode() {
+  /*
+    Generate a public room id used internally by Socket.IO and the Join button.
+    For private rooms, this id is not the secret code; the secret is joinCode.
+  */
+  let roomCode = "";
+  do {
+    roomCode = `ROOM_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  } while (activeRooms.has(roomCode));
+  return roomCode;
 }
 
 function sanitizeRgb(rgb) {
@@ -204,6 +255,31 @@ function hostUserId(room) {
   return room.players.find((player) => player.socketId === room.hostSocketId)?.userId || null;
 }
 
+function publicRoomList() {
+  /*
+    Create the main-lobby room list.
+    Only WAITING rooms appear here. Private rooms are listed, but their secret
+    joinCode is never sent to browsers.
+  */
+  return [...activeRooms.values()]
+    .filter((room) => room.phase === "WAITING")
+    .map((room) => ({
+      roomCode: room.roomCode,
+      roomName: room.roomName,
+      isPrivate: room.isPrivate,
+      level: room.level,
+      playerCount: room.players.length,
+      maxPlayers: room.maxPlayers
+    }));
+}
+
+function emitRoomList() {
+  // Broadcast the refreshed main-lobby list to every connected browser.
+  io.emit("room_list", {
+    rooms: publicRoomList()
+  });
+}
+
 function emitRoomUpdate(room) {
   /*
     Send current room status to everyone in the Socket.IO room.
@@ -212,6 +288,10 @@ function emitRoomUpdate(room) {
   */
   io.to(room.roomCode).emit("room_update", {
     roomCode: room.roomCode,
+    roomName: room.roomName,
+    isPrivate: room.isPrivate,
+    level: room.level,
+    maxPlayers: room.maxPlayers,
     phase: room.phase,
     players: publicPlayers(room),
     hostUserId: hostUserId(room)
@@ -232,7 +312,7 @@ function clearRoomTimer(room) {
   room.timerRef = null;
 }
 
-function createRoom(roomCode, hostSocketId) {
+function createRoom(roomCode, hostSocketId, options = {}) {
   /*
     Build the initial state object for one game room.
 
@@ -241,9 +321,13 @@ function createRoom(roomCode, hostSocketId) {
   */
   return {
     roomCode,
+    roomName: options.roomName || "Untitled Room",
+    isPrivate: Boolean(options.joinCode),
+    joinCode: options.joinCode || "",
     hostSocketId,
     phase: "WAITING",
-    level: 1,
+    level: options.level || 1,
+    maxPlayers: options.maxPlayers || CONFIG.MAX_PLAYERS_PER_ROOM,
     round: 0,
     turnIndex: 0,
     players: [],
@@ -253,6 +337,32 @@ function createRoom(roomCode, hostSocketId) {
     finalSubmissions: new Set(),
     timerRef: null
   };
+}
+
+function addOrUpdatePlayer(room, socket, userId, nickname) {
+  /*
+    Add a new player to a waiting room, or update the socket id if the same
+    browser joins again before the game starts.
+  */
+  const existingPlayer = room.players.find((player) => player.userId === userId);
+  if (existingPlayer) {
+    existingPlayer.socketId = socket.id;
+    existingPlayer.nickname = nickname;
+    return true;
+  }
+
+  if (room.players.length >= room.maxPlayers) {
+    return false;
+  }
+
+  room.players.push({
+    socketId: socket.id,
+    userId,
+    nickname,
+    finalGuess: null,
+    finalErrorSum: null
+  });
+  return true;
 }
 
 function resetPlayerRoundState(room) {
@@ -272,7 +382,7 @@ function startGame(room, level) {
   */
   clearRoomTimer(room);
   room.phase = "PLAYING";
-  room.level = clamp(Number(level) || 1, 1, 4);
+  room.level = normalizeLevel(level || room.level);
   room.round = 0;
   room.turnIndex = 0;
   room.targetData = generateTarget(room.level);
@@ -280,6 +390,7 @@ function startGame(room, level) {
   room.peekedUsers = new Set();
   room.finalSubmissions = new Set();
   resetPlayerRoundState(room);
+  emitRoomList();
   startRound(room);
 }
 
@@ -471,6 +582,45 @@ function endGame(room) {
 
   // The room is finished, so remove it from memory.
   activeRooms.delete(room.roomCode);
+  emitRoomList();
+}
+
+function removeSocketFromRoom(socket, room, notifyLeavingSocket = false) {
+  /*
+    Remove one socket/player from a room.
+    This is used by both the explicit Leave button and automatic disconnect.
+  */
+  const index = room.players.findIndex((player) => player.socketId === socket.id);
+  if (index === -1) return false;
+
+  const wasCurrentTurn = index === room.turnIndex;
+  room.players.splice(index, 1);
+  socket.leave(room.roomCode);
+  if (notifyLeavingSocket) socket.emit("left_room");
+
+  if (room.players.length === 0) {
+    clearRoomTimer(room);
+    activeRooms.delete(room.roomCode);
+    emitRoomList();
+    return true;
+  }
+
+  if (room.hostSocketId === socket.id) {
+    room.hostSocketId = room.players[0].socketId;
+  }
+
+  if (room.turnIndex >= room.players.length) {
+    room.turnIndex = 0;
+  }
+
+  emitRoomUpdate(room);
+  emitRoomList();
+
+  if (wasCurrentTurn && (room.phase === "GUESSING" || room.phase === "PEEKING")) {
+    advanceTurn(room);
+  }
+
+  return true;
 }
 
 io.on("connection", (socket) => {
@@ -480,7 +630,41 @@ io.on("connection", (socket) => {
     socket represents one connected browser tab. Inside this callback, we define
     every event that this browser is allowed to send to the server.
   */
-  socket.on("join_room", ({ roomCode, userId, nickname }) => {
+  socket.emit("room_list", {
+    rooms: publicRoomList()
+  });
+
+  socket.on("request_room_list", () => {
+    socket.emit("room_list", {
+      rooms: publicRoomList()
+    });
+  });
+
+  socket.on("create_room", ({ roomName, roomCode, level, maxPlayers, userId, nickname }) => {
+    /*
+      create_room is sent from the create-room popup.
+      The creator is automatically added to the new waiting room and becomes host.
+    */
+    const cleanUserId = String(userId || socket.id);
+    const cleanNickname = normalizeNickname(nickname);
+    const joinCode = normalizeOptionalRoomCode(roomCode);
+    const generatedRoomCode = generateRoomCode();
+    const cleanRoomName = normalizeRoomName(roomName, `${cleanNickname}'s room`);
+    const room = createRoom(generatedRoomCode, socket.id, {
+      roomName: cleanRoomName,
+      joinCode,
+      level: normalizeLevel(level),
+      maxPlayers: normalizeMaxPlayers(maxPlayers)
+    });
+
+    activeRooms.set(generatedRoomCode, room);
+    addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname);
+    socket.join(generatedRoomCode);
+    emitRoomUpdate(room);
+    emitRoomList();
+  });
+
+  socket.on("join_room", ({ roomCode, privateCode, userId, nickname }) => {
     /*
       join_room is sent from the lobby.
 
@@ -492,31 +676,22 @@ io.on("connection", (socket) => {
     const cleanUserId = String(userId || socket.id);
     const cleanNickname = normalizeNickname(nickname);
 
-    if (!activeRooms.has(cleanRoomCode)) {
-      // First player to join creates the room and becomes host.
-      activeRooms.set(cleanRoomCode, createRoom(cleanRoomCode, socket.id));
-    }
-
     const room = activeRooms.get(cleanRoomCode);
+    if (!room) {
+      sendError(socket, "Room not found.");
+      return;
+    }
     if (room.phase !== "WAITING") {
       sendError(socket, "This room already started.");
       return;
     }
-
-    const existingPlayer = room.players.find((player) => player.userId === cleanUserId);
-    if (existingPlayer) {
-      // Same browser rejoined before the game started; update its live socket id.
-      existingPlayer.socketId = socket.id;
-      existingPlayer.nickname = cleanNickname;
-    } else {
-      // New player joins the waiting room.
-      room.players.push({
-        socketId: socket.id,
-        userId: cleanUserId,
-        nickname: cleanNickname,
-        finalGuess: null,
-        finalErrorSum: null
-      });
+    if (room.isPrivate && normalizeOptionalRoomCode(privateCode) !== room.joinCode) {
+      sendError(socket, "Incorrect room code.");
+      return;
+    }
+    if (!addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname)) {
+      sendError(socket, "This room is full.");
+      return;
     }
 
     // Join the Socket.IO broadcast group named after the room code.
@@ -524,9 +699,26 @@ io.on("connection", (socket) => {
 
     // Tell everyone in the room about the updated player list.
     emitRoomUpdate(room);
+    emitRoomList();
   });
 
   // 수정 예정
+  socket.on("leave_room", ({ roomCode }) => {
+    // leave_room is sent by the Leave button in the waiting lobby.
+    const room = activeRooms.get(normalizeRoomCode(roomCode));
+    if (!room) {
+      socket.emit("left_room");
+      emitRoomList();
+      return;
+    }
+    if (room.phase !== "WAITING") {
+      sendError(socket, "You cannot leave from here after the game starts.");
+      return;
+    }
+
+    removeSocketFromRoom(socket, room, true);
+  });
+
   socket.on("start_game", ({ roomCode, level }) => {
     /*
       start_game is sent when the host clicks Start Game.
@@ -552,7 +744,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    startGame(room, level);
+    startGame(room, level || room.level);
   });
 
   socket.on("submit_guess", ({ roomCode, guessRGB }) => {
@@ -689,46 +881,15 @@ io.on("connection", (socket) => {
       The server removes that socket's player from any room they were in and
       keeps the room moving if the disconnect happened mid-game.
     */
-    activeRooms.forEach((room, roomCode) => {
-      const index = room.players.findIndex((player) => player.socketId === socket.id);
-      if (index === -1) return;
-
-      const wasCurrentTurn = index === room.turnIndex;
-      room.players.splice(index, 1);
-
-      if (room.players.length === 0) {
-        // Empty rooms are deleted so they do not stay in memory forever.
-        clearRoomTimer(room);
-        activeRooms.delete(roomCode);
-        return;
-      }
-
-      if (room.hostSocketId === socket.id) {
-        // If the host leaves, make the first remaining player the new host.
-        room.hostSocketId = room.players[0].socketId;
-      }
-
-      if (room.phase === "WAITING") {
-        // In the lobby, just update the visible player list.
-        emitRoomUpdate(room);
-        return;
-      }
-
-      if (room.turnIndex >= room.players.length) {
-        // If removing a player made turnIndex invalid, wrap back to the first player.
-        room.turnIndex = 0;
-      }
-
-      emitRoomUpdate(room);
-      if (wasCurrentTurn && (room.phase === "GUESSING" || room.phase === "PEEKING")) {
-        // If the active player left, advance so the game does not get stuck.
-        advanceTurn(room);
-      }
+    [...activeRooms.values()].forEach((room) => {
+      removeSocketFromRoom(socket, room);
     });
   });
 });
 
-server.listen(3000, () => {
-  // Start listening for browser requests and socket connections on localhost:3000.
-  console.log("RGB Guess server running at http://localhost:3000");
+const PORT = Number(process.env.PORT) || 3000;
+
+server.listen(PORT, () => {
+  // Start listening for browser requests and socket connections.
+  console.log(`RGB Guess server running at http://localhost:${PORT}`);
 });

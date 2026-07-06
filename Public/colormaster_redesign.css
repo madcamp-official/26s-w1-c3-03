@@ -91,6 +91,7 @@ button {
 
 /* Lobby screen: players join a room here before the real-time game starts. */
 .lobby-screen {
+  position: relative;
   width: 100%;
   min-height: 700px;
   display: grid;
@@ -107,26 +108,26 @@ button {
 }
 
 .lobby-card {
-  width: min(720px, 100%);
+  width: min(880px, 100%);
   display: grid;
-  gap: 24px;
-  padding: 34px;
+  gap: 20px;
+  padding: 30px;
   border: 1px solid var(--line);
-  border-radius: 30px;
-  background: var(--panel);
+  border-radius: 18px;
+  background: rgba(18, 22, 44, 0.9);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.09);
 }
 
 .lobby-title {
   margin: 0;
-  font-size: clamp(42px, 7vw, 72px);
-  line-height: 0.94;
-  letter-spacing: -0.06em;
+  font-size: clamp(34px, 6vw, 54px);
+  line-height: 1;
   font-weight: 950;
   text-shadow: 0 0 26px rgba(75, 125, 255, 0.38);
 }
 
-.lobby-status {
+.lobby-status,
+.waiting-room-meta {
   min-height: 21px;
   margin: 0;
   color: var(--muted);
@@ -134,10 +135,21 @@ button {
   font-weight: 700;
 }
 
-.lobby-form {
+.main-lobby-panel,
+.waiting-lobby-panel {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+.lobby-section-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.lobby-nickname-field {
+  max-width: 280px;
 }
 
 .lobby-field {
@@ -150,10 +162,10 @@ button {
 
 .lobby-field input,
 .lobby-field select {
-  min-height: 44px;
+  min-height: 42px;
   padding: 9px 12px;
   border: 1px solid var(--line);
-  border-radius: 15px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.08);
   color: var(--ink);
   outline: 0;
@@ -163,33 +175,98 @@ button {
   color: #111111;
 }
 
+.lobby-toolbar,
+.waiting-header,
+.create-room-header,
 .lobby-actions {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.lobby-button {
-  min-height: 46px;
-  padding: 12px 18px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #7cf7ff, #7c5cff 48%, #ff4bd8);
+.lobby-button,
+.room-join-button {
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #6d7cff;
   color: #ffffff;
-  font-size: 15px;
-  font-weight: 950;
-  box-shadow: 0 14px 34px rgba(124, 92, 255, 0.30);
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(109, 124, 255, 0.24);
 }
 
-.lobby-button:disabled {
+.lobby-button-secondary {
+  background: rgba(255,255,255,0.12);
+  color: #dce2ff;
+  box-shadow: none;
+}
+
+.lobby-button:disabled,
+.room-join-button:disabled {
   opacity: 0.35;
   cursor: default;
   filter: grayscale(0.5);
   box-shadow: none;
 }
 
-.lobby-players {
+.room-list {
+  min-height: 180px;
   display: grid;
-  gap: 12px;
+  gap: 8px;
+}
+
+.room-list-header,
+.room-row {
+  display: grid;
+  grid-template-columns: 64px minmax(150px, 1.4fr) 90px 100px 90px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+}
+
+.room-list-header {
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.room-row {
+  min-height: 50px;
+  color: #e9edff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.room-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-private-mark {
+  margin-left: 6px;
+  color: #7cf7ff;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.room-empty {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(255,255,255,0.18);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .lobby-player-list {
@@ -200,14 +277,14 @@ button {
 }
 
 .lobby-player-item {
-  min-height: 46px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 17px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.06);
   color: #e9edff;
   font-size: 14px;
@@ -220,6 +297,34 @@ button {
   font-weight: 950;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.create-room-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(4, 6, 16, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.create-room-panel {
+  position: relative;
+  width: min(520px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(15, 18, 40, 0.98);
+  box-shadow: var(--shadow);
+}
+
+.create-room-form {
+  display: grid;
+  gap: 12px;
 }
 
 /* Main in-game board. It is hidden while the lobby is active. */
@@ -1402,6 +1507,19 @@ input.value-box:focus {
   .lobby-form,
   .lobby-player-list {
     grid-template-columns: 1fr;
+  }
+
+  .room-list-header {
+    display: none;
+  }
+
+  .room-row {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .room-join-button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
   }
 
   .game-board {
