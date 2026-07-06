@@ -17,10 +17,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAla3aD1f8r7fJtiN-i0xjHaemKUUXxEYY",
-  authDomain: "colormaster-7e6b4.firebaseapp.com",
-  projectId: "colormaster-7e6b4",
-  storageBucket: "colormaster-7e6b4.firebasestorage.app",
+  apiKey: "AIzaSyDWZ4qh55v0fHXIEzaA9MkeVM-mAJEGCMw",
+  authDomain: "colormaster-madcamp.firebaseapp.com",
+  projectId: "colormaster-madcamp",
+  storageBucket: "colormaster-madcamp.firebasestorage.app",
 };
 
 const app = initializeApp(firebaseConfig);
@@ -117,7 +117,7 @@ export async function loginWithGoogle() {
 // 프론트엔드에서 구글 유저가 폼(아이디, 닉네임) 작성을 마치고 최종 가입 버튼을 눌렀을 때 실행됩니다.
 export async function completeGoogleSignUp(uid, email, user_id, nickname, googlePhotoURL, profileFile = null) {
   try {
-    let profileImageUrl = googlePhotoURL; // 기본적으로 구글 프로필 사진 유지
+    let profileImageUrl = "profile.png";
 
     // 유저가 구글 사진 대신 직접 새 사진을 올렸다면 Storage에 업로드
     if (profileFile) {
