@@ -244,6 +244,7 @@ button {
   backdrop-filter: blur(18px);
 }
 
+/* 배경 요소 */
 .ambient {
   position: absolute;
   width: 320px;
@@ -254,18 +255,21 @@ button {
   pointer-events: none;
 }
 
-.ambient-one {
+/* 배경 요소 1 - 파란 원 */
+.ambient-one { 
   left: -90px;
   top: 90px;
   background: #16e0ff;
 }
 
+/* 배경 요소 2 - 분홍 원 */
 .ambient-two {
   right: -90px;
   bottom: -80px;
   background: #ff45be;
 }
 
+/* 게임 화면 head */
 .top-bar {
   position: relative;
   z-index: 2;
@@ -277,10 +281,10 @@ button {
   padding: 4px 58px 6px 2px;
 }
 
-.eyebrow,
-.modal-kicker,
-.card-label,
-.round-caption {
+.eyebrow, /* 게임 화면 head text 1 - "REAL-TIME RGB GUESS"*/
+.modal-kicker, /* 팝업 내 상단 text */
+.card-label, /* 타겟 이미지 블록 text 1 - "TARGET IMAGE" */
+.round-caption { /* 라운드 수 표시 블록 text 1 - "현재 라운드" */
   margin: 0;
   color: #7cf7ff;
   font-size: 12px;
@@ -289,6 +293,7 @@ button {
   text-transform: uppercase;
 }
 
+/* 게임 화면 head text 2 - "Color Master"*/
 .game-title {
   margin: 4px 0 0;
   font-size: clamp(34px, 5vw, 60px);
@@ -316,6 +321,7 @@ button {
   letter-spacing: 0.08em;
 }
 
+/* 나가기 버튼 */
 .exit-button {
   position: absolute;
   top: 24px;
@@ -331,10 +337,12 @@ button {
   transition: transform 160ms ease;
 }
 
+/* 나가기 버튼 위에 마우스를 올렸을 때 */
 .exit-button:hover {
   transform: translateY(-2px);
 }
 
+/* 나가기 버튼 이미지 */
 .exit-icon {
   width: 36px;
   height: 36px;
@@ -343,6 +351,7 @@ button {
   pointer-events: none;
 }
 
+/* 음량 조절 버튼 및 슬라이드 바 영역 */
 .volume-control {
   position: absolute;
   right: 33px;
@@ -353,6 +362,7 @@ button {
   gap: 12px;
 }
 
+/* 음량 조절 버튼 */
 .volume-button {
   width: 44px;
   height: 44px;
@@ -364,10 +374,12 @@ button {
   transition: transform 160ms ease;
 }
 
+/* 음량 조절 버튼 위에 마우스를 올렸을 때 */
 .volume-button:hover {
   transform: translateY(-2px);
 }
 
+/* 음량 조절 버튼 이미지 */
 .volume-icon {
   width: 40px;
   height: 40px;
@@ -376,12 +388,14 @@ button {
   pointer-events: none;
 }
 
+/* 음량 조절 바 영역 */
 .volume-slider-wrap {
   width: 128px;
   display: grid;
   place-items: center;
 }
 
+/* 음량 조절 바 */
 .volume-slider {
   width: 128px;
   height: 18px;
@@ -391,12 +405,14 @@ button {
   cursor: pointer;
 }
 
+/* 음량 조절 바 track - webkit 기반 */
 .volume-slider::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 999px;
   background: #ffffff;
 }
 
+/* 음량 조절 바 thumb - webkit 기반 */
 .volume-slider::-webkit-slider-thumb {
   width: 15px;
   height: 15px;
@@ -407,12 +423,14 @@ button {
   background: #ffffff;
 }
 
+/* 음량 조절 바 track - 파이어폭스 기반 */
 .volume-slider::-moz-range-track {
   height: 3px;
   border-radius: 999px;
   background: #ffffff;
 }
 
+/* 음량 조절 바 thumb - 파이어폭스 기반 */
 .volume-slider::-moz-range-thumb {
   width: 15px;
   height: 15px;
@@ -421,13 +439,14 @@ button {
   background: #ffffff;
 }
 
-.sidebar,
-.play-area,
-.right-rail {
+.sidebar, /* 게임 화면 첫 번째 단 */
+.play-area, /* 게임 화면 두 번째 단 */
+.right-rail { /* 게임 화면의 세 번째 단 */
   position: relative;
   z-index: 2;
 }
 
+/* 게임 화면 첫 번째 단 */
 .sidebar {
   grid-area: left;
   display: grid;
@@ -436,15 +455,15 @@ button {
   min-width: 0;
 }
 
-.round-card,
-.player-panel,
-.target-card,
-.guess-card,
-.legend-card,
-.guide-card,
+.round-card, /* 라운드 수 표시 블록 */
+.player-panel, /* 플레이어 블록 */
+.target-card, /* 타겟 이미지 블록 */
+.guess-card, /* RGB 추측 블록 */
+.legend-card, /* 오차 범위 블록 */
+.guide-card, /* 가이드 이미지 블록 */
 .guide-popover,
-.choice-card,
-.final-modal,
+.choice-card, /* 결과 확인 팝업 */
+.final-modal, /* 최종 답안 팝업 */
 .result-modal {
   border: 1px solid var(--line);
   border-radius: 26px;
@@ -452,16 +471,19 @@ button {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.09);
 }
 
-.round-card {
+/* 라운드 수 표시 블록 */
+.round-card { 
   padding: 18px;
   text-align: center;
 }
 
+/* 라운드 수 표시 블록 text 1 - "현재 라운드" */
 .round-caption {
   display: block;
   text-align: center;
 }
 
+/* 라운드 수 표시 블록 text 2 - "Round n" */
 .round-label {
   position: static;
   width: 100%;
@@ -474,6 +496,7 @@ button {
   letter-spacing: -0.06em;
 }
 
+/* 게임 화면 입력 시간 타이머 배경 */
 .timer {
   position: relative;
   width: 150px;
@@ -487,20 +510,16 @@ button {
   box-shadow: var(--glow-blue);
 }
 
+/* 게임 화면 입력 시간 타이머 내 검은 원 */
 .timer::before {
   content: "";
-  position: absolute;
+  position: absolute; /* 타이머 배경 위에 존재하게 하는 속성 */
   inset: 9px;
   border-radius: 50%;
   background: rgba(10, 12, 28, 0.94);
 }
 
-.timer-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-}
-
+/* 게임 화면 입력 시간 타이머 내 시간과 text 영역 */
 .timer-inner {
   position: relative;
   z-index: 1;
@@ -509,6 +528,7 @@ button {
   justify-items: center;
 }
 
+/* 게임 화면 입력 시간 타이머 내 시간 */
 .timer-number {
   min-width: 2ch;
   font-size: 46px;
@@ -518,6 +538,7 @@ button {
   text-align: center;
 }
 
+/* 게임 화면 입력 시간 타이머 내 text - "SECONDS" */
 .timer-caption {
   color: var(--muted);
   font-size: 11px;
@@ -526,16 +547,15 @@ button {
   text-transform: uppercase;
 }
 
-.player-panel,
-.legend-card,
-.guide-card,
-.guess-card,
-.target-card {
+.player-panel, /* 플레이어 블록 */
+.legend-card, /* 오차 범위 블록 */
+.guess-card, /* RGB 추측 블록 */
+.target-card { /* 타겟 이미지 블록 */
   padding: 18px;
 }
 
-.panel-heading,
-.guess-header {
+.panel-heading, /* 블록의 head */
+.guess-header { /* RGB 추측 블록의 head */
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -546,30 +566,36 @@ button {
   font-weight: 900;
 }
 
+/* 플레이어 블록의 head */
 .player-panel .panel-heading {
   position: relative;
   top: 0px;
   left: 4px;
 }
 
+/* RGB 추측 블록의 head */
 .guess-card .guess-header {
   position: relative;
   top: 0px;
   left: 4px;
 }
 
+/* RGB 추측 블록의 head text 1 - "RGB Guess" */
 .guess-card .guess-header > span {
   position: relative;
   top: 0px;
   left: 0px;
 }
 
+/* RGB 추측 블록의 head text 2 - "0부터 255까지 입력" */
 .guess-card .guess-header > small {
   position: relative;
   top: 0px;
   left: -5px;
 }
 
+/**/
+/* RGB 추측 블록의 head text 2 - "0부터 255까지 입력" */
 .panel-heading small,
 .guess-header small {
   color: var(--muted);
@@ -577,11 +603,13 @@ button {
   font-weight: 700;
 }
 
+/* 플레이어 블록의 플레이어 목록 영역*/
 .players {
   display: grid;
   gap: 10px;
 }
 
+/* 플레이어 블록의 플레이어 목록*/
 .player-row {
   position: relative;
   min-height: 46px;
@@ -596,6 +624,7 @@ button {
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
+/* 플레이어 블록의 플레이어 목록의 플레이어 닉네임 */
 .player-name {
   position: relative;
   min-height: 32px;
@@ -614,6 +643,7 @@ button {
   content: none;
 }
 
+/* 플레이어 블록의 플레이어 목록에서 해당 턴인 플레이어 표시 */
 .player-row.is-active {
   transform: translateX(4px);
   border-color: rgba(255, 232, 90, 0.68);
@@ -638,6 +668,7 @@ button {
   font-weight: 900;
 }
 
+/* 게임 화면 두 번째 단 */
 .play-area {
   grid-area: center;
   display: grid;
@@ -646,14 +677,15 @@ button {
   align-content: start;
 }
 
+/* 타겟 이미지 블록 */
 .target-card {
   display: grid;
   justify-items: center;
   gap: 14px;
 }
 
-.image-stage,
-.final-target-image {
+.image-stage, /* 타겟 이미지 블록 이미지 */
+.final-target-image { /* 최종 답안 팝업 이미지 */
   width: min(100%, 292px);
   aspect-ratio: 1 / 1;
   overflow: hidden;
@@ -663,6 +695,7 @@ button {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.18);
 }
 
+/* 타겟 이미지 블록 text 2 - "이미지의 평균 RGB 값을 추측하세요." */
 .target-helper {
   margin: 0;
   color: var(--muted);
@@ -670,10 +703,12 @@ button {
   font-weight: 600;
 }
 
+/* RGB 추측 블록 */
 .guess-card {
   min-height: 228px;
 }
 
+/* RGB 추측 블록의 RGB 추측 영역 */
 .rgb-controls {
   width: 100%;
   margin-top: 0;
@@ -685,8 +720,8 @@ button {
   transform: none;
 }
 
-.channel,
-.final-channel {
+.channel, /* RGB 추측 블록의 추측 영역 */
+.final-channel { /* 최종 답안 팝업의 입력 영역 */
   min-height: 168px;
   display: grid;
   justify-items: center;
@@ -699,36 +734,42 @@ button {
   transition: background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
+/* RGB 추측 블록의 추측 결과 - 파란색 */
 .channel.tier-blue,
 .final-channel.tier-blue {
   background: rgba(79, 125, 255, 0.18);
   border-color: rgba(79, 125, 255, 0.58);
 }
 
+/* RGB 추측 블록의 추측 결과 - 초록색 */
 .channel.tier-green,
 .final-channel.tier-green {
   background: rgba(54, 232, 145, 0.18);
   border-color: rgba(54, 232, 145, 0.58);
 }
 
+/* RGB 추측 블록의 추측 결과 - 노란색 */
 .channel.tier-yellow,
 .final-channel.tier-yellow {
   background: rgba(247, 230, 90, 0.18);
   border-color: rgba(247, 230, 90, 0.58);
 }
 
+/* RGB 추측 블록의 추측 결과 - 주황색 */
 .channel.tier-orange,
 .final-channel.tier-orange {
   background: rgba(255, 157, 61, 0.18);
   border-color: rgba(255, 157, 61, 0.58);
 }
 
+/* RGB 추측 블록의 추측 결과 - 빨간색 */
 .channel.tier-red,
 .final-channel.tier-red {
   background: rgba(255, 76, 100, 0.18);
   border-color: rgba(255, 76, 100, 0.58);
 }
 
+/* RGB 입력 범위 */
 .bound {
   min-height: 20px;
   color: var(--muted);
@@ -738,6 +779,7 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* RGB 범위 부등호 */
 .chevron {
   width: 20px;
   height: 14px;
@@ -752,17 +794,14 @@ button {
   left: -4px;
 }
 
-.chevron.up {
-  transform: rotate(-90deg);
-  left: -4px;
-}
-
+/* RGB 추측 블록의 RGB 값 입력 영역 - 유저 턴일 때 */
 .value-entry {
   position: relative;
   width: var(--value-box-size);
   height: var(--value-box-size);
 }
 
+/* RGB 값 입력 영역 */
 .value-box {
   width: var(--value-box-size);
   height: var(--value-box-size);
@@ -780,11 +819,11 @@ button {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
 }
 
-input.value-box {
+/* input.value-box {
   padding: 0;
   text-align: center;
   -moz-appearance: textfield;
-}
+} */
 
 input.value-box::-webkit-outer-spin-button,
 input.value-box::-webkit-inner-spin-button {
@@ -796,6 +835,7 @@ input.value-box:focus {
   box-shadow: 0 0 0 4px rgba(124, 247, 255, 0.28), inset 0 1px 0 rgba(255,255,255,0.22);
 }
 
+/* RGB 값 입력 영역 text - 유저 턴일 때 */
 .value-label {
   position: absolute;
   inset: 0;
@@ -808,25 +848,29 @@ input.value-box:focus {
   pointer-events: none;
 }
 
+/* RGB 추측 블록의 RGB 값 입력 영역 text(RGB) - 유저 턴에서 입력했을 때 */
 .value-entry.has-value .value-label {
   display: none;
 }
 
+/* R 값 입력 영역 */
 .value-box.is-red {
   background: linear-gradient(145deg, #ff3350, #b3142a);
 }
 
+/* G 값 입력 영역 */
 .value-box.is-green {
   background: linear-gradient(145deg, #28f092, #099a55);
 }
 
+/* B 값 입력 영역 */
 .value-box.is-blue {
   background: linear-gradient(145deg, #5e82ff, #1d3ccc);
 }
 
-.submit-button,
-.final-submit-button,
-.result-button {
+.submit-button, /* RGB 추측 블록의 제출 버튼 */
+.final-submit-button, /* 최종 답안 제출 버튼 */
+.result-button { /**/
   min-width: 92px;
   min-height: 48px;
   padding: 12px 18px;
@@ -839,19 +883,21 @@ input.value-box:focus {
   transition: transform 160ms ease, filter 160ms ease, opacity 160ms ease;
 }
 
+/* RGB 추측 블록의 제출 버튼 */
 .submit-button {
   align-self: center;
 }
 
-.submit-button:hover,
-.final-submit-button:hover,
-.result-button:hover,
-.guide-button:hover,
-.choice-button:hover {
+.submit-button:hover, /* RGB 추측 블록의 제출 버튼 */
+.final-submit-button:hover, /* 최종 답안 제출 버튼*/
+.result-button:hover, /**/
+.guide-button:hover, /**/
+.choice-button:hover { /* RGB 선택 버튼 위에 마우스를 올렸을 때 */
   transform: translateY(-2px);
   filter: brightness(1.06);
 }
 
+/* RGB 추측 블록의 제출 버튼이 비활성 됐을 때 */
 .submit-button:disabled {
   opacity: 0.35;
   cursor: default;
@@ -859,6 +905,8 @@ input.value-box:focus {
   box-shadow: none;
 }
 
+/* RGB 추측 블록의 현재 턴 유저 표시 text */
+/* 최종 답안 팝업의 제출 여부 표시 text */
 .status-line,
 .final-status {
   min-height: 20px;
@@ -869,6 +917,7 @@ input.value-box:focus {
   text-align: center;
 }
 
+/* 게임 화면의 세 번째 단 */
 .right-rail {
   grid-area: right;
   display: grid;
@@ -878,12 +927,14 @@ input.value-box:focus {
   min-width: 0;
 }
 
+/* 가이드 이미지 블록 */
 .guide-card {
   display: grid;
   gap: 8px;
   padding: 10px;
 }
 
+/* 가이드 이미지 블록의 head*/
 .guide-card .panel-heading {
   margin-bottom: 0;
   position: relative;
@@ -891,14 +942,16 @@ input.value-box:focus {
   left: 7px;
 }
 
+/* 가이드 이미지 블록의 가이드 이미지 */
 .guide-card .guide-image {
   width: 131%;
-  /* max-height: 400px; */
   display: block;
   object-fit: contain;
   justify-self: center;
+  border-radius: 20px;
 }
 
+/* 오차 범위 블록 */
 .legend-card {
   margin-top: 0px;
 }
@@ -935,11 +988,13 @@ input.value-box:focus {
   letter-spacing: -0.05em;
 }
 
+/* 오차 범위 블록의 오차 범위 영역 */
 .legend {
   display: grid;
   gap: 10px;
 }
 
+/* 오차 범위 행 */
 .legend-row {
   display: grid;
   grid-template-columns: 1fr 28px;
@@ -950,6 +1005,7 @@ input.value-box:focus {
   white-space: nowrap;
 }
 
+/* 오차 범위 행의 색 */
 .legend-dot {
   width: 18px;
   height: 18px;
@@ -958,13 +1014,18 @@ input.value-box:focus {
   box-shadow: 0 0 0 4px rgba(255,255,255,0.06);
 }
 
+/* 오차 범위 행의 색 - 파란색 */
 .dot-blue { background: var(--tier-blue); }
+/* 오차 범위 행의 색 - 초록색 */
 .dot-green { background: var(--tier-green); }
+/* 오차 범위 행의 색 - 노란색 */
 .dot-yellow { background: var(--tier-yellow); }
+/* 오차 범위 행의 색 - 주황색 */
 .dot-orange { background: var(--tier-orange); }
+/* 오차 범위 행의 색 - 빨간색 */
 .dot-red { background: var(--tier-red); }
 
-.guide-popover {
+/* .guide-popover {
   position: absolute;
   top: 104px;
   right: 28px;
@@ -982,22 +1043,15 @@ input.value-box:focus {
   font-weight: 950;
 }
 
-.guide-image {
-  width: 100%;
-  display: block;
-  object-fit: contain;
-  border-radius: 20px;
-}
-
 .guide-note {
   margin: 12px 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
-}
+} */
 
 .popup-close,
-.choice-close {
+.choice-close { /* 결과 확인 팝업 닫기 버튼 */
   position: absolute;
   top: 12px;
   right: 14px;
@@ -1012,8 +1066,8 @@ input.value-box:focus {
   line-height: 1;
 }
 
-.choice-layer,
-.final-layer,
+.choice-layer, /* 결과 확인 div */
+.final-layer, /* 최종 답안 div */
 .result-layer {
   position: absolute;
   inset: 0;
@@ -1025,12 +1079,12 @@ input.value-box:focus {
   backdrop-filter: blur(6px);
 }
 
-.choice-layer {
+.choice-layer { /* 결과 확인 div */
   z-index: 30;
 }
 
-.choice-card,
-.final-modal,
+.choice-card, /* 결과 확인 팝업 */
+.final-modal, /* 최종 답안 팝업 */
 .result-modal {
   position: relative;
   width: min(560px, 100%);
@@ -1042,11 +1096,13 @@ input.value-box:focus {
   box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,0.06);
 }
 
+/* 결과 확인 팝업 */
 .choice-card {
   min-height: 500px;
   padding: 58px 38px 42px;
 }
 
+/* 결과 확인 팝업 선택 시간 타이머 배경 */
 .choice-popup-timer {
   position: absolute;
   top: 30px;
@@ -1063,6 +1119,7 @@ input.value-box:focus {
   box-shadow: var(--glow-blue);
 }
 
+/* 결과 확인 팝업 선택 시간 타이머 내 검은 원 */
 .choice-popup-timer::before {
   content: "";
   position: absolute;
@@ -1071,12 +1128,15 @@ input.value-box:focus {
   background: rgba(10, 12, 28, 0.96);
 }
 
+/* 결과 확인 팝업 선택 시간 타이머 내 시간 */
+/* 결과 확인 팝업 선택 시간 타이머 내 text - "SECONDS" */
 .choice-popup-time,
 .choice-popup-caption {
   position: relative;
   z-index: 1;
 }
 
+/* 결과 확인 팝업 선택 시간 타이머 내 시간 */
 .choice-popup-time {
   min-width: 2ch;
   text-align: center;
@@ -1085,6 +1145,7 @@ input.value-box:focus {
   font-weight: 950;
 }
 
+/* 결과 확인 팝업 선택 시간 타이머 내 text - "SECONDS" */
 .choice-popup-caption {
   color: var(--muted);
   font-size: 12px;
@@ -1092,8 +1153,8 @@ input.value-box:focus {
   letter-spacing: 0.14em;
 }
 
-.choice-title,
-.final-title,
+.choice-title, /* 결과 확인 팝업 text 2 - "어떤 색을 볼까요?" */
+.final-title, /* 최종 답안 팝업 text 2 - "최종 답안" */
 .result-title {
   margin: 0;
   font-size: clamp(30px, 4vw, 42px);
@@ -1103,12 +1164,14 @@ input.value-box:focus {
   text-align: center;
 }
 
+/* RGB 선택 버튼 영역 */
 .choice-buttons {
   display: grid;
   grid-template-columns: repeat(3, minmax(96px, 126px));
   gap: 22px;
 }
 
+/* RGB 선택 버튼 */
 .choice-channel {
   display: grid;
   justify-items: center;
@@ -1116,6 +1179,7 @@ input.value-box:focus {
   gap: 13px;
 }
 
+/* RGB 선택 범위 */
 .choice-bound {
   min-height: 19px;
   color: var(--muted);
@@ -1125,6 +1189,7 @@ input.value-box:focus {
   font-variant-numeric: tabular-nums;
 }
 
+/* RGB 선택 버튼 위 부등호 */
 .choice-chevron {
   width: 18px;
   height: 12px;
@@ -1140,13 +1205,12 @@ input.value-box:focus {
   left: -11px;
 }
 
+/* RGB 선택 버튼 아래 부등호 */
 .choice-chevron-up {
-  transform: rotate(-90deg);
-  position: relative;
   top: 2px;
-  left: -11px;
 }
 
+/* RGB 선택 버튼 */
 .choice-button {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -1161,6 +1225,7 @@ input.value-box:focus {
   transition: transform 160ms ease, filter 160ms ease;
 }
 
+/* RGB 선택 버튼 내 text */
 .choice-label {
   width: 100%;
   height: 100%;
@@ -1169,15 +1234,25 @@ input.value-box:focus {
   text-align: center;
 }
 
+/* RGB 선택 버튼 - R */
 .choice-button.is-red { background: linear-gradient(145deg, #ff3350, #b3142a); }
+/* RGB 선택 버튼 - G */
 .choice-button.is-green { background: linear-gradient(145deg, #28f092, #099a55); }
+/* RGB 선택 버튼 - B */
 .choice-button.is-blue { background: linear-gradient(145deg, #5e82ff, #1d3ccc); }
+
+/* RGB 선택 결과 - 파란색 */
 .choice-button.tier-blue { border-color: var(--tier-blue); }
+/* RGB 선택 결과 - 초록색 */
 .choice-button.tier-green { border-color: var(--tier-green); }
+/* RGB 선택 결과 - 노란색 */
 .choice-button.tier-yellow { border-color: var(--tier-yellow); }
+/* RGB 선택 결과 - 주황색 */
 .choice-button.tier-orange { border-color: var(--tier-orange); }
+/* RGB 선택 결과 - 빨간색 */
 .choice-button.tier-red { border-color: var(--tier-red); }
 
+/* RGB 선택 후 선택 버튼 내 text */
 .choice-button.tier-blue .choice-label,
 .choice-button.tier-green .choice-label,
 .choice-button.tier-yellow .choice-label,
@@ -1186,12 +1261,14 @@ input.value-box:focus {
   font-size: 44px;
 }
 
+/* 최종 답안 팝업 */
 .final-modal {
   width: min(520px, 100%);
   padding-top: 58px;
   gap: 18px;
 }
 
+/* 최종 답안 팝업 입력 시간 타이머 배경 */
 .final-popup-timer {
   position: absolute;
   top: 35px;
@@ -1208,6 +1285,7 @@ input.value-box:focus {
   box-shadow: var(--glow-blue);
 }
 
+/* 최종 답안 팝업 입력 시간 타이머 내 검은 원 */
 .final-popup-timer::before {
   content: "";
   position: absolute;
@@ -1216,12 +1294,15 @@ input.value-box:focus {
   background: rgba(10, 12, 28, 0.96);
 }
 
+/* 최종 답안 팝업 입력 시간 타이머 내 시간 */
+/* 최종 답안 팝업 입력 시간 타이머 내 text - "SECONDS" */
 .final-popup-time,
 .final-popup-caption {
   position: relative;
   z-index: 1;
 }
 
+/* 최종 답안 팝업 입력 시간 타이머 내 시간 */
 .final-popup-time {
   min-width: 2ch;
   text-align: center;
@@ -1230,6 +1311,7 @@ input.value-box:focus {
   font-weight: 950;
 }
 
+/* 최종 답안 팝업 입력 시간 타이머 내 text - "SECONDS" */
 .final-popup-caption {
   color: var(--muted);
   font-size: 9px;
@@ -1241,12 +1323,14 @@ input.value-box:focus {
   width: min(540px, 100%);
 }
 
+/* 최종 답안 팝업 이미지 */
 .final-target-image {
   width: 170px;
   border-radius: 0;
   transform: none;
 }
 
+/* 최종 답안 입력 영역 */
 .final-inputs {
   width: 100%;
   display: grid;
@@ -1260,6 +1344,7 @@ input.value-box:focus {
   height: 72px;
 }
 
+/* 최종 답안 팝업의 RGB 입력 영역 */
 .final-channel .value-box {
   width: 72px;
   height: 72px;
@@ -1268,18 +1353,24 @@ input.value-box:focus {
   line-height: 72px;
 }
 
+/* 최종 답안 팝업의 RGB 입력 영역 text */
 .final-channel .value-label {
   font-size: 32px;
 }
 
+/* 최종 답안 팝업의 RGB 입력 범위 */
 .final-channel .bound {
   font-size: 20px;
 }
 
+/* 최종 답안 팝업의 부등호 */
 .final-channel .chevron {
   width: 20px;
   height: 14px;
   font-size: 23px;
+  position: relative;
+  top: 0px;
+  left: -6px;
 }
 
 .final-channel:has(.is-red) .chevron {
@@ -1302,6 +1393,7 @@ input.value-box:focus {
   left: -6px;
 }
 
+/* 최종 답안 제출 버튼 */
 .final-submit-button {
   transform: none;
   margin-bottom: 0;

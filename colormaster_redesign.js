@@ -260,7 +260,7 @@ function renderChannels() {
         <div class="bound">${bounds.high}</div>
         <div class="chevron" aria-hidden="true">&le;</div>
         ${box}
-        <div class="chevron up" aria-hidden="true">&le;</div>
+        <div class="chevron" aria-hidden="true">&le;</div>
         <div class="bound">${bounds.low}</div>
       </div>
     `;
