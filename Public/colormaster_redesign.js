@@ -188,7 +188,8 @@ const game = {
   finalSubmitted: false,
 
   // Filled after game_over.
-  score: null
+  score: null,
+  results: []
 };
 
 /*
@@ -640,16 +641,41 @@ function resultBoxesFor(values, labelPrefix) {
   // Helper used by the result modal to display R/G/B boxes as read-only text inputs.
   return CHANNELS.map((channel) => {
     const meta = CHANNEL_META[channel];
+    const value = values?.[channel] ?? 0;
     return `
       <input
         class="value-box ${meta.css}"
         type="text"
-        value="${values[channel]}"
+        value="${value}"
         readonly
         aria-label="${labelPrefix} ${meta.label} value"
       />
     `;
   }).join("");
+}
+
+function finalGuessText(guess) {
+  // Convert a final guess object into compact table text.
+  if (!guess) return "-";
+  return `R ${guess.r ?? 0} / G ${guess.g ?? 0} / B ${guess.b ?? 0}`;
+}
+
+function resultTableRows() {
+  /*
+    The server already sends results sorted by smallest error.
+    Sorting again here keeps the table correct even if that server detail changes.
+  */
+  return [...(game.results || [])]
+    .sort((a, b) => (a.finalError ?? 0) - (b.finalError ?? 0))
+    .map((result, index) => `
+      <tr class="${result.userId === game.localPlayerId ? "is-me" : ""}">
+        <td>${index + 1}</td>
+        <td><span class="result-profile" aria-hidden="true"></span></td>
+        <td>${escapeHtml(result.nickname || "Player")}</td>
+        <td>${escapeHtml(finalGuessText(result.finalGuess))}</td>
+        <td>0 RP</td>
+      </tr>
+    `).join("");
 }
 
 // 얘도 수정 예정
@@ -662,19 +688,29 @@ function renderResultModal() {
   }
 
   els.resultText.innerHTML = `
-    <div class="result-row">
-      <p class="result-row-title">Correct RGB</p>
+    <div class="result-answer">
+      <p class="result-row-title">Answer</p>
       <div class="result-boxes" aria-label="Correct RGB result">
         ${resultBoxesFor(game.targetRgb, "Correct")}
       </div>
     </div>
-    <div class="result-row">
-      <p class="result-row-title">Final Guess</p>
-      <div class="result-boxes" aria-label="Final RGB guess">
-        ${resultBoxesFor(game.finalAnswer, "Final guess")}
-      </div>
+    <p class="result-total-error">My total error: ${game.score.totalError}</p>
+    <div class="result-table-wrap">
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>Index</th>
+            <th>Profile</th>
+            <th>Name</th>
+            <th>Final Guess</th>
+            <th>RP</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${resultTableRows()}
+        </tbody>
+      </table>
     </div>
-    <p class="result-total-error">Total error: ${game.score.totalError}</p>
   `;
 }
 
@@ -1087,6 +1123,7 @@ function handleRoundStart(data) {
   // Only reset clue boundaries at the first round of the game.
   if (data.round === 1) resetBoundaries();
   game.score = null;
+  game.results = [];
   game.finalAnswer = { r: "", g: "", b: "" };
   game.currentSubmission = null;
   game.turnSubmitted = false;
@@ -1219,9 +1256,10 @@ function handleGameOver(data) {
   clearAllTimers();
   game.phase = "score";
   game.targetRgb = data.targetRgb;
+  game.results = data.results || [];
 
   // Find this player's result inside the server's full result array.
-  const myResult = (data.results || []).find((result) => result.userId === game.localPlayerId);
+  const myResult = game.results.find((result) => result.userId === game.localPlayerId);
   game.finalAnswer = myResult?.finalGuess || game.finalAnswer;
   game.score = {
     totalError: myResult?.finalError ?? 0,
