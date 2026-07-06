@@ -87,6 +87,21 @@ const upload = multer({
   }
 });
 
+function profileImageProxyUrl(filePath) {
+  // Store and return an app-local URL so browsers load images through EC2.
+  return `/api/profile-image-file?path=${encodeURIComponent(filePath)}`;
+}
+
+function cleanProfileImagePath(rawPath) {
+  /*
+    Only allow files inside the profile_images folder.
+    This prevents the image proxy from becoming a general Firebase file reader.
+  */
+  const filePath = String(rawPath || "").trim();
+  if (!filePath.startsWith("profile_images/") || filePath.includes("..")) return "";
+  return filePath;
+}
+
 /*
   Central game settings.
 
@@ -204,18 +219,55 @@ app.post("/api/profile-image", upload.single("profileImage"), async (req, res) =
       }
     });
 
-    const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${adminBucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+    const profileImageUrl = profileImageProxyUrl(filePath);
 
     await adminDb.collection("User").doc(userId).update({
-      profile_image: downloadUrl
+      profile_image: profileImageUrl
     });
 
     res.json({
-      profileImage: downloadUrl
+      profileImage: profileImageUrl
     });
   } catch (error) {
     console.error("Profile image upload failed:", error);
     res.status(500).json({ error: "Profile image upload failed." });
+  }
+});
+
+app.get("/api/profile-image-file", async (req, res) => {
+  /*
+    Profile image display proxy:
+    Browser -> this Express server -> Firebase Storage.
+
+    This solves the remaining ERR_SSL_PROTOCOL_ERROR case where the browser
+    could upload through EC2, but then tried to display the image directly from
+    firebasestorage.googleapis.com.
+  */
+  try {
+    if (!adminBucket) {
+      return res.status(503).send("Firebase Admin is not configured on the server.");
+    }
+
+    const filePath = cleanProfileImagePath(req.query.path);
+    if (!filePath) {
+      return res.status(400).send("Invalid profile image path.");
+    }
+
+    const storageFile = adminBucket.file(filePath);
+    const [metadata] = await storageFile.getMetadata();
+    res.setHeader("Content-Type", metadata.contentType || "application/octet-stream");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+
+    storageFile.createReadStream()
+      .on("error", (error) => {
+        console.error("Profile image proxy failed:", error);
+        if (!res.headersSent) res.status(404).send("Profile image not found.");
+        else res.destroy(error);
+      })
+      .pipe(res);
+  } catch (error) {
+    console.error("Profile image proxy failed:", error);
+    res.status(500).send("Profile image proxy failed.");
   }
 });
 

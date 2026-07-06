@@ -32,6 +32,10 @@ const storage = getStorage(app);
 function normalizeProfileImage(profileImage) {
   const image = String(profileImage || "").trim();
   if (!image || image === "profile.png") return "/Images/profile.png";
+  if (image.startsWith("https://firebasestorage.googleapis.com/")) {
+    const match = image.match(/\/o\/([^?]+)/);
+    if (match) return `/api/profile-image-file?path=${match[1]}`;
+  }
   return image;
 }
 
