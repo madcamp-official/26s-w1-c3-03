@@ -240,47 +240,10 @@ function saveMockUser() {
   sessionStorage.setItem("loggedInNickname", mockCurrentUser.nickname);
 }
 
-function createMockLeaderboardUsers() {
-  /*
-    Temporary ranking data for screen development.
-    Later this array can come from the real user/ranking API.
-  */
-  const names = ["Aster", "Brite", "Cipher", "Dawn", "Echo", "Flare", "Glint", "Halo", "Iris", "Jade"];
-  const users = [{
-    id: mockCurrentUser.id,
-    nickname: mockCurrentUser.nickname,
-    rankingPoint: mockCurrentUser.rankingPoint,
-    profileImage: mockCurrentUser.profileImage
-  }];
-
-  while (users.length < 5) {
-    const name = `${names[Math.floor(Math.random() * names.length)]}${Math.floor(100 + Math.random() * 900)}`;
-    const hue = Math.floor(Math.random() * 360);
-    users.push({
-      id: `mock_rank_${users.length}`,
-      nickname: name,
-      rankingPoint: 700 + Math.floor(Math.random() * 2400),
-      profileImage: createMockProfileImage(name, hue)
-    });
-  }
-
-  return users.sort((a, b) => b.rankingPoint - a.rankingPoint);
-}
-
-function loadMockLeaderboardUsers() {
-  try {
-    const storedUsers = sessionStorage.getItem("colorMasterMockLeaderboard");
-    if (storedUsers) return JSON.parse(storedUsers);
-  } catch (_error) {
-    // Fall through and create fresh ranking data if stored data is invalid.
-  }
-
-  const users = createMockLeaderboardUsers();
-  sessionStorage.setItem("colorMasterMockLeaderboard", JSON.stringify(users));
-  return users;
-}
-
-const mockLeaderboardUsers = loadMockLeaderboardUsers();
+let leaderboardUsers = [];
+let leaderboardLoaded = false;
+let leaderboardLoading = false;
+let leaderboardLoadPromise = null;
 
 let friends = [];
 let friendsLoaded = false;
@@ -473,7 +436,8 @@ const roomClient = {
   lobbyView: "rooms",
   nickname: "",
   hostUserId: null,
-  pendingPrivateRoomCode: ""
+  pendingPrivateRoomCode: "",
+  privateCode: ""
 };
 
 /*
@@ -881,26 +845,71 @@ function renderRoomList() {
 }
 
 function renderRankingTable() {
-  // Paint the temporary leaderboard table in highest-ranking-point order.
+  // Paint the real leaderboard table in highest-ranking-point order.
   if (!els.rankingTableBody) return;
-  const usersById = new Map(mockLeaderboardUsers.map((user) => [user.id, user]));
-  usersById.set(game.localPlayerId, {
-    id: game.localPlayerId,
-    nickname: mockCurrentUser.nickname,
-    rankingPoint: mockCurrentUser.rankingPoint,
-    profileImage: mockCurrentUser.profileImage
-  });
 
-  els.rankingTableBody.innerHTML = [...usersById.values()]
+  if (leaderboardLoading) {
+    els.rankingTableBody.innerHTML = `
+      <tr>
+        <td colspan="4">Loading rankings...</td>
+      </tr>
+    `;
+    return;
+  }
+
+  if (!leaderboardUsers.length) {
+    els.rankingTableBody.innerHTML = `
+      <tr>
+        <td colspan="4">No ranking data yet.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  els.rankingTableBody.innerHTML = leaderboardUsers
+    .slice()
     .sort((a, b) => b.rankingPoint - a.rankingPoint)
     .map((user, index) => `
       <tr class="${user.id === game.localPlayerId ? "is-me" : ""}">
         <td>${index + 1}</td>
-        <td><img class="ranking-profile-image" src="${user.profileImage}" alt="" /></td>
+        <td><img class="ranking-profile-image" src="${normalizeProfileImage(user.profileImage)}" alt="" /></td>
         <td>${escapeHtml(user.nickname)}</td>
-        <td>${user.rankingPoint} RP</td>
+        <td>${Number(user.rankingPoint) || 0} RP</td>
       </tr>
     `).join("");
+}
+
+async function loadLeaderboardFromDb(force = false) {
+  if (leaderboardLoadPromise) return leaderboardLoadPromise;
+  if (leaderboardLoaded && !force) return leaderboardUsers;
+
+  leaderboardLoading = true;
+  renderRankingTable();
+  if (els.rankingStatus) els.rankingStatus.textContent = "Loading rankings...";
+
+  leaderboardLoadPromise = import(LOGIN_MODULE_URL)
+    .then(({ getLeaderboardUsers }) => getLeaderboardUsers(50))
+    .then((dbUsers) => {
+      leaderboardUsers = dbUsers;
+      leaderboardLoaded = true;
+      renderRankingTable();
+      if (els.rankingStatus) els.rankingStatus.textContent = leaderboardUsers.length
+        ? "Highest ranking points first."
+        : "No ranking data yet.";
+      return leaderboardUsers;
+    })
+    .catch((error) => {
+      console.error("Failed to load leaderboard:", error);
+      if (els.rankingStatus) els.rankingStatus.textContent = "Could not load rankings from DB.";
+      return leaderboardUsers;
+    })
+    .finally(() => {
+      leaderboardLoading = false;
+      leaderboardLoadPromise = null;
+      renderRankingTable();
+    });
+
+  return leaderboardLoadPromise;
 }
 
 async function loadFriendsFromDb(force = false) {
@@ -1065,11 +1074,44 @@ function closeInviteFriendModal() {
   if (els.inviteFriendLayer) els.inviteFriendLayer.hidden = true;
 }
 
-function sendGameInvite(friendId) {
-  // Temporary frontend-only behavior until real invite delivery is connected.
+async function sendGameInvite(friendId) {
   const friend = friends.find((item) => item.id === friendId);
   if (!friend) return;
-  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = `Game invite sent to ${friend.nickname}.`;
+
+  if (!roomClient.joined || !roomClient.roomCode) {
+    if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "Join or create a room before inviting friends.";
+    return;
+  }
+
+  const button = [...document.querySelectorAll("[data-send-game-invite]")]
+    .find((candidate) => candidate.dataset.sendGameInvite === friendId);
+  const previousButtonText = button?.textContent || "Invite";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Sending...";
+  }
+  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = `Sending invite to ${friend.nickname}...`;
+
+  try {
+    const { sendGameInvite: sendGameInviteToDb } = await import(LOGIN_MODULE_URL);
+    await sendGameInviteToDb(mockCurrentUser.id, friend.id, {
+      roomCode: roomClient.roomCode,
+      privateCode: roomClient.privateCode,
+      isPrivate: roomClient.isPrivate,
+      name: roomClient.roomName,
+      level: roomClient.level,
+      currentPlayers: game.players.length,
+      maxPlayers: roomClient.maxPlayers
+    });
+    if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = `Game invite sent to ${friend.nickname}.`;
+    if (button) button.textContent = "Sent";
+  } catch (error) {
+    console.error("Failed to send game invite:", error);
+    if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = error.message || "Could not send game invite.";
+    if (button) button.textContent = previousButtonText;
+  } finally {
+    if (button) button.disabled = button.textContent === "Sent";
+  }
 }
 
 function updateFriendDeleteModeButton() {
@@ -1739,9 +1781,10 @@ function createRoomFromLobby() {
   }
 
   roomClient.nickname = currentNickname();
+  roomClient.privateCode = els.createRoomCodeInput.value.trim();
   socket.emit("create_room", {
     roomName: els.createRoomNameInput.value.trim(),
-    roomCode: els.createRoomCodeInput.value.trim(),
+    roomCode: roomClient.privateCode,
     level: Number(els.createLevelSelect.value),
     maxPlayers: Number(els.maxPlayersSelect.value),
     userId: game.localPlayerId,
@@ -1762,6 +1805,7 @@ function joinRoom(roomCode, privateCode = "") {
   }
 
   roomClient.roomCode = String(roomCode || "").trim().toUpperCase();
+  roomClient.privateCode = String(privateCode || "").trim();
   roomClient.nickname = currentNickname();
   socket.emit("join_room", {
     roomCode: roomClient.roomCode,
@@ -1783,6 +1827,7 @@ function resetToMainLobby(message = "Choose or create a room.") {
   roomClient.isPrivate = false;
   roomClient.lobbyView = "rooms";
   roomClient.pendingPrivateRoomCode = "";
+  roomClient.privateCode = "";
   game.phase = "lobby";
   game.players = [];
   game.targetColors = [];
@@ -1809,7 +1854,7 @@ function showRankingPage() {
   roomClient.lobbyView = "ranking";
   game.phase = "lobby";
   render();
-  if (els.rankingStatus) els.rankingStatus.textContent = "Highest ranking points first.";
+  loadLeaderboardFromDb(true);
 }
 
 function showFriendsPage() {
@@ -2055,6 +2100,20 @@ async function handleMailboxResponse(noticeId, response) {
       } else {
         await actions.rejectFriendRequest(mockCurrentUser.id, notice.id);
       }
+    } else if (notice.source === "db" && notice.type === "invite") {
+      const actions = await import(LOGIN_MODULE_URL);
+      if (response === "accept") {
+        const room = await actions.acceptGameInvite(mockCurrentUser.id, notice.id);
+        mockMailboxNotices = mockMailboxNotices.filter((item) => item.id !== noticeId);
+        saveMockMailboxNotices();
+        updateMailboxUnreadDots();
+        closeMailboxDetail();
+        closeMailboxModal();
+        renderMailboxNotices();
+        joinRoom(room.roomCode, room.privateCode || "");
+        return;
+      }
+      await actions.rejectGameInvite(mockCurrentUser.id, notice.id);
     }
 
     mockMailboxNotices = mockMailboxNotices.filter((item) => item.id !== noticeId);

@@ -10,7 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import {
-  getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp
+  getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import {
@@ -252,6 +252,27 @@ function friendFromUserDoc(userId, userData = {}, fallbackData = {}) {
   };
 }
 
+function leaderboardUserFromDoc(userDoc) {
+  const data = userDoc.data();
+  return {
+    id: userDoc.id,
+    nickname: data.nickname || data.user_id || "Player",
+    rankingPoint: Number(data.point ?? data.rankingPoint) || 0,
+    profileImage: normalizeProfileImage(data.profile_image || data.profileImage)
+  };
+}
+
+export async function getLeaderboardUsers(maxUsers = 50) {
+  const safeLimit = Math.max(1, Math.min(Number(maxUsers) || 50, 100));
+  const leaderboardQuery = query(
+    collection(db, "User"),
+    orderBy("point", "desc"),
+    limit(safeLimit)
+  );
+  const leaderboardSnapshot = await getDocs(leaderboardQuery);
+  return leaderboardSnapshot.docs.map(leaderboardUserFromDoc);
+}
+
 export async function setUserPresence(userId, online) {
   const cleanUserId = String(userId || "").trim();
   if (!cleanUserId) return;
@@ -414,6 +435,80 @@ export async function rejectFriendRequest(userId, requestId) {
   const cleanRequestId = String(requestId || "").trim();
   if (!cleanUserId || !cleanRequestId) throw new Error("Missing friend request data.");
   await deleteDoc(doc(db, "User", cleanUserId, "Mailbox", cleanRequestId));
+}
+
+export async function sendGameInvite(userId, friendUserId, roomInfo = {}) {
+  const cleanUserId = String(userId || "").trim();
+  const cleanFriendUserId = String(friendUserId || "").trim();
+  const cleanRoomCode = String(roomInfo.roomCode || "").trim().toUpperCase();
+  if (!cleanUserId) throw new Error("Missing current user id.");
+  if (!cleanFriendUserId) throw new Error("Missing friend user id.");
+  if (!cleanRoomCode) throw new Error("Join or create a room before inviting friends.");
+  if (cleanUserId === cleanFriendUserId) throw new Error("You cannot invite yourself.");
+
+  const [currentUserDoc, friendUserDoc] = await Promise.all([
+    getDoc(doc(db, "User", cleanUserId)),
+    getDoc(doc(db, "User", cleanFriendUserId))
+  ]);
+  if (!currentUserDoc.exists()) throw new Error("Current user data was not found.");
+  if (!friendUserDoc.exists()) throw new Error("Friend user data was not found.");
+
+  const friendDoc = await getDoc(doc(db, "User", cleanUserId, "Friends", cleanFriendUserId));
+  if (!friendDoc.exists()) throw new Error("You can only invite users on your friends list.");
+
+  const currentUser = friendFromUserDoc(cleanUserId, currentUserDoc.data());
+  const inviteId = `game_invite_${cleanRoomCode}_${cleanUserId}`;
+  const inviteDocRef = doc(db, "User", cleanFriendUserId, "Mailbox", inviteId);
+  const existingInviteDoc = await getDoc(inviteDocRef);
+  if (existingInviteDoc.exists()) throw new Error("Game invite is already pending.");
+
+  const room = {
+    roomCode: cleanRoomCode,
+    privateCode: String(roomInfo.privateCode || "").trim(),
+    isPrivate: Boolean(roomInfo.isPrivate),
+    name: String(roomInfo.name || "Waiting Room").trim(),
+    level: Number(roomInfo.level) || 1,
+    currentPlayers: Number(roomInfo.currentPlayers) || 1,
+    maxPlayers: Number(roomInfo.maxPlayers) || 5
+  };
+
+  await setDoc(inviteDocRef, {
+    type: "invite",
+    status: "pending",
+    senderId: cleanUserId,
+    sender: currentUser.nickname,
+    profileImage: currentUser.profileImage,
+    rankingPoint: currentUser.rankingPoint,
+    message: `"${currentUser.nickname}" has invited you to a game.`,
+    fullMessage: `"${currentUser.nickname}" has invited you to a game.`,
+    room,
+    createdAt: serverTimestamp()
+  });
+
+  return { id: inviteId, room };
+}
+
+export async function acceptGameInvite(userId, noticeId) {
+  const cleanUserId = String(userId || "").trim();
+  const cleanNoticeId = String(noticeId || "").trim();
+  if (!cleanUserId || !cleanNoticeId) throw new Error("Missing game invite data.");
+
+  const inviteDocRef = doc(db, "User", cleanUserId, "Mailbox", cleanNoticeId);
+  const inviteDoc = await getDoc(inviteDocRef);
+  if (!inviteDoc.exists()) throw new Error("Game invite was not found.");
+
+  const invite = inviteDoc.data();
+  if (invite.type !== "invite" || !invite.room?.roomCode) throw new Error("This notice is not a game invite.");
+
+  await deleteDoc(inviteDocRef);
+  return invite.room;
+}
+
+export async function rejectGameInvite(userId, noticeId) {
+  const cleanUserId = String(userId || "").trim();
+  const cleanNoticeId = String(noticeId || "").trim();
+  if (!cleanUserId || !cleanNoticeId) throw new Error("Missing game invite data.");
+  await deleteDoc(doc(db, "User", cleanUserId, "Mailbox", cleanNoticeId));
 }
 
 export async function deleteFriend(userId, friendUserId) {
