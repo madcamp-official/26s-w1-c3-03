@@ -33,7 +33,8 @@ const http = require("http");
 
 // firebase-admin lets this trusted Node server write to Firestore/Storage.
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+// const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 
 // multer parses multipart/form-data file uploads from the browser.
@@ -101,65 +102,6 @@ function cleanProfileImagePath(rawPath) {
   const filePath = String(rawPath || "").trim();
   if (!filePath.startsWith("profile_images/") || filePath.includes("..")) return "";
   return filePath;
-}
-
-function storagePathFromProfileImage(profileImage) {
-  /*
-    The profile_image field can contain a few shapes from different versions:
-    - /api/profile-image-file?path=profile_images%2F...
-    - https://firebasestorage.googleapis.com/.../o/profile_images%2F...
-    - https://storage.googleapis.com/bucket/profile_images/...
-    - a raw profile_images/... path
-
-    Convert those back into a Firebase Storage path so the old file can be
-    deleted when a user uploads a replacement image.
-  */
-  const imageText = String(profileImage || "").trim();
-  if (!imageText) return "";
-
-  try {
-    const parsed = new URL(imageText, "http://localhost");
-    const pathParam = parsed.searchParams.get("path");
-    if (pathParam) return cleanProfileImagePath(pathParam);
-
-    const firebaseObjectMatch = parsed.pathname.match(/\/o\/([^/]+)/);
-    if (firebaseObjectMatch) {
-      return cleanProfileImagePath(decodeURIComponent(firebaseObjectMatch[1]));
-    }
-
-    if (adminBucket && parsed.hostname === "storage.googleapis.com") {
-      const bucketPrefix = `/${adminBucket.name}/`;
-      if (parsed.pathname.startsWith(bucketPrefix)) {
-        return cleanProfileImagePath(decodeURIComponent(parsed.pathname.slice(bucketPrefix.length)));
-      }
-    }
-  } catch (_error) {
-    // Fall through and check whether the value is already a raw Storage path.
-  }
-
-  return cleanProfileImagePath(imageText);
-}
-
-async function deletePreviousProfileImage(previousProfileImage, userId, newFilePath) {
-  /*
-    Delete only files that look like this user's uploaded profile images.
-    This prevents accidental deletion of shared/default assets or another
-    user's image if bad data ever appears in Firestore.
-  */
-  const previousPath = storagePathFromProfileImage(previousProfileImage);
-  const userProfilePrefix = `profile_images/${userId}_`;
-
-  if (!previousPath || previousPath === newFilePath || !previousPath.startsWith(userProfilePrefix)) {
-    return;
-  }
-
-  try {
-    const previousFile = adminBucket.file(previousPath);
-    const [exists] = await previousFile.exists();
-    if (exists) await previousFile.delete();
-  } catch (error) {
-    console.warn("Previous profile image delete failed:", previousPath, error);
-  }
 }
 
 /*
@@ -283,10 +225,6 @@ app.post("/api/profile-image", upload.single("profileImage"), async (req, res) =
       return res.status(400).json({ error: "Please upload a JPG, PNG, WEBP, or GIF image." });
     }
 
-    const userDocRef = adminDb.collection("User").doc(userId);
-    const userDoc = await userDocRef.get();
-    const previousProfileImage = userDoc.exists ? userDoc.data().profile_image : "";
-
     const extension = allowedTypes.get(file.mimetype);
     const token = crypto.randomUUID();
     const filePath = `profile_images/${userId}_${Date.now()}.${extension}`;
@@ -304,11 +242,9 @@ app.post("/api/profile-image", upload.single("profileImage"), async (req, res) =
 
     const profileImageUrl = profileImageProxyUrl(filePath);
 
-    await userDocRef.update({
+    await adminDb.collection("User").doc(userId).update({
       profile_image: profileImageUrl
     });
-
-    await deletePreviousProfileImage(previousProfileImage, userId, filePath);
 
     res.json({
       profileImage: profileImageUrl
@@ -508,7 +444,8 @@ function publicPlayers(room) {
     nickname: player.nickname,
     index,
     isHost: player.socketId === room.hostSocketId,
-    hasPeeked: room.peekedUsers.has(player.userId)
+    hasPeeked: room.peekedUsers.has(player.userId),
+    isReady: player.isReady || false
   }));
 }
 
@@ -621,6 +558,7 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
     socketId: socket.id,
     userId,
     nickname,
+    isReady: false,
     finalGuess: null,
     finalErrorSum: null
   });
@@ -842,6 +780,17 @@ function endGame(room) {
     results
   });
 
+  if (adminDb) {
+    results.forEach((result) => {
+      // 비회원(preview)이 아닌 로그인한 정상 유저인 경우에만 저장
+      if (result.userId && !result.userId.startsWith("preview_")) {
+        adminDb.collection("User").doc(result.userId).update({
+          rankingPoint: FieldValue.increment(result.earnedPoint) // 기존 점수에 얻은 점수를 더함
+        }).catch(err => console.error("RP 업데이트 실패:", err));
+      }
+    });
+  }
+
   // The room is finished, so remove it from memory.
   activeRooms.delete(room.roomCode);
   emitRoomList();
@@ -979,6 +928,22 @@ io.on("connection", (socket) => {
     }
 
     removeSocketFromRoom(socket, room, true);
+  });
+
+  socket.on("toggle_ready", ({ roomCode }) => {
+    // 1. 방을 찾고 상태가 대기 중(WAITING)인지 확인
+    const room = activeRooms.get(normalizeRoomCode(roomCode));
+    if (!room || room.phase !== "WAITING") return;
+
+    // 2. 이벤트를 보낸 플레이어 찾기
+    const player = room.players.find((p) => p.socketId === socket.id);
+    if (!player) return;
+
+    // 3. 준비 상태 반전 (true -> false / false -> true)
+    player.isReady = !player.isReady;
+
+    // 4. 방에 있는 모든 사람에게 업데이트된 정보 전송
+    emitRoomUpdate(room);
   });
 
   socket.on("start_game", ({ roomCode, level }) => {

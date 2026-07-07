@@ -698,7 +698,6 @@ function setLobbyStatus(message) {
 
 function renderLobbyUser() {
   // Paint the temporary logged-in user box from mock data.
-  document.body.classList.toggle("is-guest-user", Boolean(mockCurrentUser.isGuest));
   setProfileImage(els.lobbyProfileImage, mockCurrentUser.profileImage);
   if (els.lobbyNickname) els.lobbyNickname.textContent = mockCurrentUser.nickname;
   if (els.lobbyRankingPoint) els.lobbyRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
@@ -709,14 +708,6 @@ function renderLobbyUser() {
   if (els.friendsNickname) els.friendsNickname.textContent = mockCurrentUser.nickname;
   if (els.friendsRankingPoint) els.friendsRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
   if (els.nicknameInput) els.nicknameInput.value = mockCurrentUser.nickname;
-  if (els.openCreateRoomButton) els.openCreateRoomButton.hidden = Boolean(mockCurrentUser.isGuest);
-  [
-    els.lobbyUserInfoButton,
-    els.rankingUserInfoButton,
-    els.friendsUserInfoButton
-  ].forEach((button) => {
-    if (button) button.disabled = Boolean(mockCurrentUser.isGuest);
-  });
 }
 
 function escapeHtml(value) {
@@ -782,7 +773,9 @@ function playersFromServer(players) {
     id: player.userId,
     name: player.nickname,
     isHost: player.isHost,
-    hasPeeked: Boolean(player.hasPeeked)
+    hasPeeked: Boolean(player.hasPeeked),
+    rankingPoint: Number(player.rankingPoint || player.point || 0), // RP 추가
+    isReady: Boolean(player.isReady) // 준비 상태 추가
   }));
 }
 
@@ -797,12 +790,18 @@ function currentTitle() {
 }
 
 function roomLevelLabel(level) {
-  return {
+  const count = Number(level) || 1;
+  
+  // 숫자에 맞는 난이도 텍스트를 매핑합니다.
+  const labels = {
     1: "Easy",
     2: "Normal",
     3: "Hard",
     4: "Extreme"
-  }[Number(level)] || "Easy";
+  };
+  
+  // 1~4 범위를 벗어나는 값이 오면 기본값으로 "Easy"를 반환합니다.
+  return labels[count] || "Easy";
 }
 
 function renderRoomList() {
@@ -826,7 +825,7 @@ function renderRoomList() {
       return `
         <div class="room-row">
           <span>${index + 1}</span>
-          <span class="room-name">${escapeHtml(room.roomName)}${room.isPrivate ? `<span class="room-private-mark">(P)</span>` : ""}</span>
+          <span class="room-name">${escapeHtml(room.roomName)}${room.isPrivate ? `<img class="room-private-icon" src="/Images/lock.png" alt="비공개" />` : ""}</span>
           <span>${roomLevelLabel(room.level)}</span>
           <span>${room.playerCount}/${room.maxPlayers}</span>
           <button class="room-join-button" type="button" data-join-room="${escapeHtml(room.roomCode)}" data-private="${room.isPrivate ? "true" : "false"}" ${isFull ? "disabled" : ""}>참여</button>
@@ -1247,9 +1246,17 @@ function renderLobby() {
   }
 
   const isHost = roomClient.hostUserId === game.localPlayerId;
-  const privateMark = roomClient.isPrivate ? " (P)" : "";
-  els.waitingRoomTitle.textContent = `${roomClient.roomName || "Waiting Room"}${privateMark}`;
-  els.waitingRoomMeta.textContent = `${roomLevelLabel(roomClient.level)} | ${game.players.length}/${roomClient.maxPlayers} players`;
+  // const privateMark = roomClient.isPrivate ? " (P)" : "";
+  // els.waitingRoomTitle.textContent = `${roomClient.roomName || "Waiting Room"}${privateMark}`;
+  // els.waitingRoomMeta.textContent = `${roomLevelLabel(roomClient.level)} | ${game.players.length}/${roomClient.maxPlayers} players`;
+  // els.startGameButton.hidden = !isHost;
+  // els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 2;
+  // const privateMark = roomClient.isPrivate ? " (P)" : "";
+  // els.waitingRoomTitle.textContent = `${roomClient.roomName || "Waiting Room"}${privateMark}`;
+  const privateMark = roomClient.isPrivate ? `<img class="room-private-icon" src="/Images/lock.png" alt="비공개" />` : "";
+  els.waitingRoomTitle.innerHTML = `${escapeHtml(roomClient.roomName || "Waiting Room")}${privateMark}`;
+  els.waitingRoomMeta.textContent = `${roomLevelLabel(roomClient.level)}`; // <-- 변경됨
+
   els.startGameButton.hidden = !isHost;
   els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 2;
 
@@ -1257,24 +1264,92 @@ function renderLobby() {
     innerHTML replaces the whole player-list container with newly generated HTML.
     map(...) creates one HTML string per player; join("") combines them into one string.
   */
-  const playerSlots = game.players.map((player) => `
-      <div class="waiting-player-item">
-        <span>${escapeHtml(player.name)}</span>
-        <span class="waiting-player-badge">${player.isHost ? "Host" : "Player"}</span>
-      </div>
-    `).join("");
+  const playerSlots = game.players.map((player, index) => {
+    const isMe = player.id === game.localPlayerId;
+    const isReady = player.isReady;
+    const statusText = isReady ? "준비 완료" : "준비중";
+    const crown = player.isHost ? " 👑" : "";
+
+    let statusHtml;
+    if (isMe) {
+      const btnClass = isReady ? "is-ready" : "is-not-ready";
+      statusHtml = `<button class="waiting-ready-button ${btnClass}" type="button" data-toggle-ready="true">준비 완료</button>`;
+    } else {
+      const dotClass = isReady ? "is-online" : "is-offline"; 
+      statusHtml = `
+        <span class="friend-status">
+          <span class="friend-status-dot ${dotClass}" aria-hidden="true"></span>
+          ${statusText}
+        </span>
+      `;
+    }
+
+    return `
+      <tr class="${isMe ? "is-me" : ""}">
+        <td>${index + 1}</td>
+        <td><img class="players-profile-image" src="${normalizeProfileImage(player.profileImage)}" alt="" style="width: 40px; height: 40px; border-radius: 8px;" /></td>
+        <td>${escapeHtml(player.name)}${crown}</td>
+        <td>${player.rankingPoint} RP</td>
+        <td>
+          <div class="friend-status-cell">
+            ${statusHtml}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
   const emptySlotCount = Math.max(0, roomClient.maxPlayers - game.players.length);
   const emptySlots = Array.from({ length: emptySlotCount }, (_, index) => `
-      <div class="waiting-player-item is-empty-slot">
-        <button class="waiting-invite-slot-button" type="button" data-open-invite-friends="${index + 1}">Invite Friend</button>
-      </div>
-    `).join("");
+    <tr>
+      <td>${game.players.length + index + 1}</td>
+      <td colspan="4" style="text-align: center; padding: 16px 0;">
+        <button class="waiting-invite-slot-button" type="button" data-open-invite-friends="${index + 1}">+ 친구 초대</button>
+      </td>
+    </tr>
+  `).join("");
 
-  els.lobbyPlayersList.innerHTML = playerSlots + emptySlots;
+  // 확실하게 tbody 태그를 찾아서 넣도록 안전장치 추가
+  const targetTbody = document.querySelector("tbody#lobbyPlayersList");
+  if (targetTbody) {
+    targetTbody.innerHTML = playerSlots + emptySlots;
+  } else if (els.lobbyPlayersList) {
+    els.lobbyPlayersList.innerHTML = playerSlots + emptySlots;
+  }
 
+  // 친구 초대 버튼 클릭 이벤트 다시 연결
   document.querySelectorAll("[data-open-invite-friends]").forEach((button) => {
     button.addEventListener("click", openInviteFriendModal);
   });
+
+  // 본인 준비 상태 토글 버튼 이벤트 다시 연결
+  document.querySelectorAll("[data-toggle-ready]").forEach((button) => {
+    button.addEventListener("click", () => {
+      console.log("준비 상태 토글 클릭됨!"); // 디버깅용 로그
+      if (socket) {
+        socket.emit("toggle_ready", { roomCode: roomClient.roomCode });
+      }
+    });
+  });
+
+  // const playerSlots = game.players.map((player) => `
+  //     <div class="waiting-player-item">
+  //       <span>${escapeHtml(player.name)}</span>
+  //       <span class="waiting-player-badge">${player.isHost ? "Host" : "Player"}</span>
+  //     </div>
+  //   `).join("");
+  // const emptySlotCount = Math.max(0, roomClient.maxPlayers - game.players.length);
+  // const emptySlots = Array.from({ length: emptySlotCount }, (_, index) => `
+  //     <div class="waiting-player-item is-empty-slot">
+  //       <button class="waiting-invite-slot-button" type="button" data-open-invite-friends="${index + 1}">Invite Friend</button>
+  //     </div>
+  //   `).join("");
+
+  // els.lobbyPlayersList.innerHTML = playerSlots + emptySlots;
+
+  // document.querySelectorAll("[data-open-invite-friends]").forEach((button) => {
+  //   button.addEventListener("click", openInviteFriendModal);
+  // });
 }
 
 function renderPlayers() {
@@ -1492,17 +1567,39 @@ function resultTableRows() {
     The server already sends results sorted by smallest error.
     Sorting again here keeps the table correct even if that server detail changes.
   */
+  // return [...(game.results || [])]
+  //   .sort((a, b) => (a.finalError ?? 0) - (b.finalError ?? 0))
+  //   .map((result, index) => `
+  //     <tr class="${result.userId === game.localPlayerId ? "is-me" : ""}">
+  //       <td>${index + 1}</td>
+  //       <td><span class="result-profile" aria-hidden="true"></span></td>
+  //       <td>${escapeHtml(result.nickname || "Player")}</td>
+  //       <td>${escapeHtml(finalGuessText(result.finalGuess))}</td>
+  //       <td>0 RP</td>
+  //     </tr>
+  //   `).join("");
   return [...(game.results || [])]
     .sort((a, b) => (a.finalError ?? 0) - (b.finalError ?? 0))
-    .map((result, index) => `
+    .map((result, index) => {
+      // 대기실에서 받아두었던 game.players 배열에서 해당 유저의 프로필 사진을 찾습니다.
+      const playerInfo = game.players.find(p => p.id === result.userId) || {};
+      const profileImg = playerInfo.profileImage ? normalizeProfileImage(playerInfo.profileImage) : "/Images/profile.png";
+      
+      // 서버에서 계산해서 보내준 '이번 게임 획득 포인트(earnedPoint)'를 사용합니다.
+      const earned = result.earnedPoint || 0;
+      
+      // 양수일 경우 가독성을 위해 앞에 '+' 기호를 붙여줍니다. (예: +10 RP, 0 RP, -5 RP)
+      const displayRp = earned > 0 ? `+${earned}` : earned;
+
+      return `
       <tr class="${result.userId === game.localPlayerId ? "is-me" : ""}">
         <td>${index + 1}</td>
-        <td><span class="result-profile" aria-hidden="true"></span></td>
+        <td><img class="result-profile-image" src="${profileImg}" alt="" /></td>
         <td>${escapeHtml(result.nickname || "Player")}</td>
         <td>${escapeHtml(finalGuessText(result.finalGuess))}</td>
-        <td>0 RP</td>
+        <td style="color: ${earned > 0 ? '#31e981' : (earned < 0 ? '#ff4c64' : '#e9edff')}; font-weight: 950;">${displayRp} RP</td>
       </tr>
-    `).join("");
+    `}).join("");
 }
 
 // 얘도 수정 예정
@@ -1734,10 +1831,6 @@ function currentNickname() {
 function openCreateRoomModal() {
   // Show the create-room popup and provide a friendly default room name.
   if (!els.createRoomLayer) return;
-  if (mockCurrentUser.isGuest) {
-    setLobbyStatus("Guests cannot create rooms.");
-    return;
-  }
   els.createRoomNameInput.value = `${currentNickname()}'s room`;
   els.createRoomCodeInput.value = "";
   els.createRoomLayer.hidden = false;
@@ -1829,12 +1922,6 @@ function createRoomFromLobby() {
     A blank room code creates a public room. A non-blank room code creates a
     private room that other users must enter before joining.
   */
-  if (mockCurrentUser.isGuest) {
-    setLobbyStatus("Guests cannot create rooms.");
-    closeCreateRoomModal();
-    return;
-  }
-
   if (!socket) {
     setLobbyStatus("Open this page through the Node server to use rooms.");
     return;
@@ -2858,6 +2945,12 @@ function handleGameOver(data) {
     totalError: myResult?.finalError ?? 0,
     points: myResult?.earnedPoint ?? 0
   };
+
+  if (mockCurrentUser && game.score.points) {
+    mockCurrentUser.rankingPoint = Number(mockCurrentUser.rankingPoint || 0) + game.score.points;
+    saveMockUser();
+  }
+
   render();
 }
 
@@ -2935,7 +3028,6 @@ document.addEventListener("click", () => {
 ].forEach((button) => {
   if (!button) return;
   button.addEventListener("click", () => {
-    if (mockCurrentUser.isGuest) return;
     openUserInfoModal();
   });
 });
@@ -2948,18 +3040,7 @@ document.addEventListener("click", () => {
   if (!button) return;
   button.addEventListener("click", async () => {
     closeProfileMenus();
-    try {
-      if (mockCurrentUser.isGuest) {
-        const { deleteGuestAccount } = await import(LOGIN_MODULE_URL);
-        await deleteGuestAccount(mockCurrentUser.id);
-      } else {
-        await stopPresenceTracking();
-      }
-    } catch (error) {
-      console.error("Logout cleanup failed:", error);
-      alert(error.message || "로그아웃 처리 중 문제가 발생했습니다.");
-      return;
-    }
+    await stopPresenceTracking();
     clearLoginSession();
     window.location.href = LOGIN_PAGE_URL;
   });

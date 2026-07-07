@@ -1,8 +1,9 @@
 /* Game waiting screen: shown after a player joins a room and before the board starts. */
 .game-waiting-screen {
   position: relative;
-  width: 100%;
-  min-height: 700px;
+  width: 1120px;
+  height: 852.39px;
+  min-height: 0;
   display: grid;
   place-items: center;
   padding: 28px;
@@ -17,8 +18,9 @@
 }
 
 .game-waiting-card {
-  width: 100%;
-  min-height: 640px;
+  width: 101%;
+  height: 101%;
+  min-height: 0;
   display: grid;
   gap: 20px;
   padding: 30px;
@@ -28,8 +30,16 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.09);
 }
 
-.game-status,
-.waiting-room-meta {
+.waiting-room-info {
+  width: 100%;
+  display: flex;
+  justify-content: space-between; /* 방 이름은 왼쪽 끝, 난이도는 오른쪽 끝 정렬 */
+  align-items: baseline;          /* 두 텍스트의 아랫선 기준을 일치시킴 */
+  padding: 0 10px; 
+  box-sizing: border-box;
+}
+
+.game-status {
   min-height: 21px;
   margin: 0;
   color: var(--muted);
@@ -37,17 +47,26 @@
   font-weight: 700;
 }
 
+.waiting-room-meta {
+  min-height: auto;
+  margin: 0;
+  color: var(--muted);
+  font-size: 26px;
+  font-weight: 800;
+}
+
 .waiting-lobby-panel {
   position: relative;
   display: grid;
   gap: 14px;
+  height: 90%;
 }
 
-.game-section-title {
+.waiting-room-info .game-section-title {
   margin: 0;
   color: var(--ink);
-  font-size: 20px;
-  font-weight: 900;
+  font-size: 30px;
+  font-weight: 950;
 }
 
 .waiting-header,
@@ -56,17 +75,265 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+}
+
+.waiting-header{
+  width: 100%;
+  max-width: 937px;
+  margin: 60px auto 20px auto; /* 위아래 여백과 가운데 정렬 */
+  display: flex;
+  align-items: center;
+}
+
+.exit-room-button {
+  /* position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 12;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  transition: transform 160ms ease; */
+  position: absolute;
+  top: -15px;    /* 위쪽 레이아웃 여백에 맞춰 미세 조정 가능 */
+  right: -17px;  /* 오른쪽 카드 여백에 맞춰 미세 조정 가능 */
+  z-index: 12;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  transition: transform 160ms ease;
+}
+
+.exit-room-button:hover {
+  transform: translateY(-2px);
+}
+
+.exit-room-icon {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.waiting-players-panel {
+  /* display: grid;
+  min-width: 0;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  padding: 14px;
+  transform: translate(-50%, 110px);
+  width: 937px;
+  height: 590px;
+  min-height: 0;
+  grid-template-rows: auto 1fr;
+  gap: 14px; */
+  position: relative; /* 공중에 떠있던 absolute 속성을 relative로 변경 */
+  transform: none;    /* 강제로 위치를 옮기던 transform 제거 */
+  top: auto;
+  left: auto;
+  width: 100%;
+  max-width: 937px;   /* 헤더와 정확히 일치하는 너비 */
+  height: 500px;
+  margin: 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.players-table-wrap {
+  /* min-height: 0;
+  height: 100%;
+  padding: 0 12px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.025);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 247, 255, 0.62) rgba(255, 255, 255, 0.06);
+  overflow: auto;
+  border-radius: 8px; */
+  width: 100%;
+  height: 100%;
+  padding: 0; 
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  overflow: hidden;
+}
+
+.players-table {
+  /* width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  color: #e9edff;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: left; */
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.players-table th,
+.players-table td {
+  /* padding: 7px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  text-align: center;
+  vertical-align: middle;
+  color: var(--muted);
+  font-weight: 950;
+  text-transform: uppercase; */
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  vertical-align: middle; /* 글자, 이미지, 버튼의 수직 중앙을 일치시킴 */
+}
+
+.players-table th {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.players-table td {
+  color: #e9edff;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.players-table th:nth-child(1) { width: 80px; }
+.players-table th:nth-child(2) { width: 120px; }
+.players-table th:nth-child(3) { width: 300px; }
+.players-table th:nth-child(4) { width: 180px; }
+
+.players-empty {
+  height: 420px;
+  color: var(--muted);
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.players-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.players-table tr.is-me {
+  background: rgba(124, 247, 255, 0.10);
+}
+
+.players-profile-image {
+  /* width: 50px;
+  height: 50px;
+  display: block;
+  margin: 0 auto;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255,255,255,0.08); */
+  width: 44px;
+  height: 44px;
+  display: inline-block; /* 텍스트와 동일한 라인에 배치하여 수직 정렬이 먹히게 함 */
+  vertical-align: middle;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 준비 상태 텍스트 + 점(Dot) 영역 */
+.friend-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #e9edff;
+  font-size: 20px;
+}
+
+.friend-status-cell {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.friend-status-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+/* 준비 완료 (초록색) */
+.friend-status-dot.is-online {
+  background: #31e981;
+  box-shadow: 0 0 0 4px rgba(49, 233, 129, 0.12);
+}
+
+/* 준비 중 (빨간색) */
+.friend-status-dot.is-offline {
+  background: #ff4c64;
+  box-shadow: 0 0 0 4px rgba(255, 76, 100, 0.12);
+}
+
+/* 본인 준비 완료/준비 중 토글 버튼 */
+.waiting-ready-button {
+  min-height: 32px;
+  min-width: 90px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 20px;
+  font-weight: 850;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.waiting-ready-button.is-not-ready {
+  border-radius: 8px;
+  background: #6d7cff;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(109, 124, 255, 0.24);
+}
+
+.waiting-ready-button.is-ready {
+  background: rgba(49, 233, 129, 0.12);
+  border-color: rgba(49, 233, 129, 0.42);
+  color: #bbf7d0;
+}
+
+.waiting-ready-button.is-ready:hover {
+  background: rgba(49, 233, 129, 0.2);
+  border-color: rgba(49, 233, 129, 0.72);
+}
+
+/* 하단 게임 시작 버튼 영역 */
+.waiting-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
 }
 
 .game-button {
-  min-height: 40px;
+  min-height: 42px;
   padding: 10px 14px;
   border-radius: 8px;
   background: #6d7cff;
   color: #ffffff;
-  font-size: 14px;
-  font-weight: 900;
+  font-size: 25px;
+  font-weight: 950;
   box-shadow: 0 10px 24px rgba(109, 124, 255, 0.24);
 }
 
@@ -83,12 +350,11 @@
   box-shadow: none;
 }
 
-.waiting-player-list {
-  min-height: 120px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
+/* .waiting-player-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+} */
 
 .waiting-player-item {
   min-height: 72px;
@@ -103,6 +369,7 @@
   color: #e9edff;
   font-size: 14px;
   font-weight: 800;
+  margin: 10px;
 }
 
 .waiting-player-item.is-empty-slot {
@@ -118,7 +385,7 @@
   border-radius: 8px;
   background: rgba(124, 247, 255, 0.10);
   color: #dffcff;
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 900;
 }
 
@@ -194,7 +461,7 @@
   color: #e9edff;
   font-size: 14px;
   font-weight: 800;
-  text-align: left;
+  text-align: center;
 }
 
 .invite-friend-table th,
@@ -202,6 +469,7 @@
   padding: 12px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.10);
   vertical-align: middle;
+  text-align: center;
 }
 
 .invite-friend-table th {
@@ -239,6 +507,76 @@
   padding: 28px 12px;
   color: var(--muted);
   text-align: center;
+}
+
+.waiting-volume-control {
+  position: fixed;
+  right: 40px;
+  bottom: 40px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.waiting-volume-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  transition: transform 160ms ease;
+}
+
+.waiting-volume-button:hover {
+  transform: translateY(-2px);
+}
+
+.waiting-volume-slider-wrap {
+  width: 128px;
+  display: grid;
+  place-items: center;
+}
+
+.waiting-volume-slider {
+  width: 128px;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.waiting-volume-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.waiting-volume-slider::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  margin-top: -6px;
+  appearance: none;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.waiting-volume-slider::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.waiting-volume-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
 }
 
 .game-board {
@@ -1387,7 +1725,7 @@ input.value-box:focus {
   color: #e9edff;
   font-size: 13px;
   font-weight: 800;
-  text-align: left;
+  text-align: center;
 }
 
 .result-table th,
@@ -1395,6 +1733,7 @@ input.value-box:focus {
   padding: 12px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.10);
   vertical-align: middle;
+  text-align: center;
 }
 
 .result-table th {
@@ -1412,12 +1751,22 @@ input.value-box:focus {
   background: rgba(124, 247, 255, 0.10);
 }
 
-.result-profile {
+/* .result-profile {
   width: 30px;
   height: 30px;
   display: inline-block;
   border: 1px solid rgba(255,255,255,0.22);
   border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+} */
+.result-profile-image {
+  width: 40px;
+  height: 40px;
+  display: inline-block;
+  vertical-align: middle; /* 텍스트와 높낮이를 예쁘게 맞춤 */
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 8px;
+  object-fit: cover; /* 이미지가 찌그러지지 않고 원형 안에 꽉 차도록 설정 */
   background: rgba(255,255,255,0.08);
 }
 
@@ -1426,8 +1775,8 @@ input.value-box:focus {
   top: 18px;
   right: 18px;
   min-width: 0;
-  width: 42px;
-  height: 42px;
+  width: 35px;
+  height: 35px;
   padding: 0;
   border-radius: 0;
   background: transparent url("/Images/close_icon.png") center / 34px 34px no-repeat;
@@ -1436,6 +1785,16 @@ input.value-box:focus {
   font-size: 0;
   overflow: hidden;
   transform: none;
+}
+
+/* 비공개 방 자물쇠 아이콘 스타일 */
+.room-private-icon {
+  width: 18px;         /* 글자 크기에 맞게 조절 (방 제목 크기가 크면 22px 등으로 키우셔도 됩니다) */
+  height: 18px;
+  margin-left: 8px;    /* 텍스트와 아이콘 사이 간격 */
+  vertical-align: middle; 
+  transform: translateY(-2px); /* 글자 중앙 십자선과 시각적으로 딱 맞게 미세 조정 */
+  object-fit: contain;
 }
 
 [hidden] {

@@ -15,19 +15,50 @@
       <div class="game-waiting-card">
         <!-- Waiting lobby: shown after this browser joins one room. -->
         <section class="waiting-lobby-panel" id="waitingLobbyPanel" aria-label="Players waiting in room" hidden>
+          <button class="exit-room-button" id="leaveRoomButton" type="button" aria-label="방 나가기">
+            <img class="exit-room-icon" src="/Images/exit_icon.png" alt="" />
+          </button>
+
           <div class="waiting-header">
-            <div>
+            <div class="waiting-room-info">
               <h3 class="game-section-title" id="waitingRoomTitle">Waiting Room</h3>
               <p class="waiting-room-meta" id="waitingRoomMeta"></p>
             </div>
-            <button class="game-button game-button-secondary" id="leaveRoomButton" type="button">Leave</button>
           </div>
 
+          <section class="waiting-players-panel" aria-label="참여 유저 목록">
+            <div class="players-table-wrap">
+                <table class="players-table">
+                  <thead>
+                    <tr>
+                      <th>No.</th>
+                      <th>Profile</th>
+                      <th>Nickname</th>
+                      <th>Ranking Point</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="lobbyPlayersList"></tbody>
+                </table>
+              </div>
+          </section>
+
           <!-- Empty on purpose: JavaScript fills this with the current waiting players. -->
-          <div class="waiting-player-list" id="lobbyPlayersList"></div>
+          <!-- <div class="waiting-player-list" id="lobbyPlayersList"></div> -->
 
           <!-- JavaScript shows this only for the host and enables it when at least two players are present. -->
-          <button class="game-button" id="startGameButton" type="button" disabled hidden>Start Game</button>
+          <div class="waiting-footer">
+            <button class="game-button" id="startGameButton" type="button" disabled hidden>게임 시작</button>
+          </div>
+
+          <div class="waiting-volume-control" id="volumeControl">
+            <div class="waiting-volume-slider-wrap" id="volumeSliderWrap" hidden>
+              <input class="waiting-volume-slider" id="volumeSlider" type="range" min="0" max="100" value="70" aria-label="Volume" />
+            </div>
+            <button class="waiting-volume-button" id="volumeButton" type="button" aria-label="Volume" aria-expanded="false">
+              <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+            </button>
+          </div>
         </section>
       </div>
 
@@ -36,7 +67,6 @@
         <div class="invite-friend-panel" role="dialog" aria-modal="true" aria-labelledby="inviteFriendTitle">
           <div class="invite-friend-header">
             <div>
-              <p class="eyebrow">ONLINE FRIENDS</p>
               <h3 class="game-section-title" id="inviteFriendTitle">Invite Friend</h3>
             </div>
             <button class="invite-friend-close-button" id="closeInviteFriendButton" type="button" aria-label="Close invite friend">
@@ -156,7 +186,7 @@
           </div>
           <button class="choice-close" id="closeChoice" type="button" aria-label="Close choice popup">x</button>
           <p class="modal-kicker">PEEK PHASE</p>
-          <h3 class="choice-title" id="choiceTitle">Choose one color channel</h3>
+          <h3 class="choice-title" id="choiceTitle">어떤 색을 볼까요?</h3>
           <div class="choice-buttons" id="choiceButtons"></div>
         </div>
       </div>
@@ -209,7 +239,6 @@
 
       <div class="result-layer" id="resultLayer" hidden>
         <div class="result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
-          <p class="modal-kicker">RESULT</p>
           <h3 class="result-title" id="resultTitle">Game Result</h3>
           <div class="result-text" id="resultText" aria-live="polite"></div>
           <button class="result-button" id="closeResult" type="button">Close</button>

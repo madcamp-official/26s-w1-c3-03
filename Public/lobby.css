@@ -1524,6 +1524,16 @@ body.is-guest-user .main-lobby-panel .lobby-room-heading {
   gap: 12px;
 }
 
+/* 비공개 방 자물쇠 아이콘 스타일 */
+.room-private-icon {
+  width: 18px;         /* 글자 크기에 맞게 조절 (방 제목 크기가 크면 22px 등으로 키우셔도 됩니다) */
+  height: 18px;
+  margin-left: 8px;    /* 텍스트와 아이콘 사이 간격 */
+  vertical-align: middle; 
+  transform: translateY(-2px); /* 글자 중앙 십자선과 시각적으로 딱 맞게 미세 조정 */
+  object-fit: contain;
+}
+
 /* 아래부터는 예전 통합 CSS에서 남아 있는 게임 화면 관련 스타일이다. */
 /* 로비 전용 화면을 수정할 때는 보통 이 아래 구역은 건드리지 않는다. */
 
