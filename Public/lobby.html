@@ -226,8 +226,10 @@
       <div class="create-room-layer" id="createRoomLayer" hidden>
         <div class="create-room-panel" role="dialog" aria-modal="true" aria-labelledby="createRoomTitle">
           <div class="create-room-header">
-            <h3 class="lobby-section-title" id="createRoomTitle">Create Room</h3>
-            <button class="popup-close" id="closeCreateRoomButton" type="button" aria-label="Close create room">x</button>
+            <h3 class="lobby-section-title create-room-title" id="createRoomTitle">방 만들기</h3>
+            <button class="user-info-close-button create-room-close-button" id="closeCreateRoomButton" type="button" aria-label="Close create room">
+              <img class="user-info-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
           </div>
 
           <div class="create-room-form">
@@ -242,10 +244,10 @@
             <label class="lobby-field">
               <span>Room Level</span>
               <select id="createLevelSelect">
-                <option value="1">1 color</option>
-                <option value="2">2 colors</option>
-                <option value="3">3 colors</option>
-                <option value="4">4 colors</option>
+                <option value="1">Easy</option>
+                <option value="2">Normal</option>
+                <option value="3">Hard</option>
+                <option value="4">Extreme</option>
               </select>
             </label>
             <label class="lobby-field">
@@ -260,8 +262,7 @@
           </div>
 
           <div class="lobby-actions">
-            <button class="lobby-button" id="createRoomButton" type="button">Create Room</button>
-            <button class="lobby-button lobby-button-secondary" id="cancelCreateRoomButton" type="button">Close</button>
+            <button class="lobby-button create-room-submit-button" id="createRoomButton" type="button">방 만들기</button>
           </div>
         </div>
       </div>

@@ -92,6 +92,10 @@
   gap: 0;
 }
 
+body.is-guest-user .lobby-top-actions {
+  display: none;
+}
+
 .lobby-nav-button,
 .lobby-home-button {
   position: relative;
@@ -341,6 +345,12 @@
 }
 
 /* 서버에 보낼 nickname 값을 보관하지만 화면에는 보이지 않는 input이다. */
+.profile-action-button:disabled {
+  opacity: 0.38;
+  cursor: default;
+  pointer-events: none;
+}
+
 .lobby-hidden-input {
   position: absolute;
   width: 1px;
@@ -423,6 +433,10 @@
 }
 
 /* JS가 상태 메시지를 업데이트할 수 있도록 남겨두되 화면에서는 숨기는 상태 문구다. */
+body.is-guest-user .main-lobby-panel .lobby-room-heading {
+  display: none;
+}
+
 .lobby-status-hidden {
   position: absolute;
   width: 1px;
@@ -798,11 +812,22 @@
   border-radius: 8px;
   background: rgba(255,255,255,0.08);
   color: var(--ink);
+  font-size: 16px;
+  font-weight: 850;
   outline: 0;
 }
 
+.lobby-field select {
+  appearance: none;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
 .lobby-field select option {
-  color: #111111;
+  background: #161a35;
+  color: #e9edff;
+  font-size: 16px;
+  font-weight: 850;
 }
 
 /* 여러 팝업의 헤더/액션 줄에서 공통으로 쓰는 가로 정렬 스타일이다. */
@@ -1079,8 +1104,9 @@
 
 /* 방 만들기 팝업 박스다. */
 .create-room-panel {
+  --create-room-panel-width: 310px;
   position: relative;
-  width: min(520px, 100%);
+  width: min(var(--create-room-panel-width), 100%);
   display: grid;
   gap: 18px;
   padding: 24px;
@@ -1091,6 +1117,62 @@
 }
 
 /* 비공개 방 입장 코드를 입력하는 작은 팝업 박스다. */
+.create-room-title {
+  font-size: 22px;
+}
+
+.create-room-close-button {
+  top: 14px;
+  right: 14px;
+}
+
+.create-room-panel .lobby-field {
+  font-size: 16px;
+}
+
+.create-room-panel .lobby-field input,
+.create-room-panel .lobby-field select {
+  font-size: 16px;
+}
+
+.create-room-panel .lobby-field select {
+  padding-right: 42px;
+  border-color: rgba(255,255,255,0.18);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05)),
+    linear-gradient(45deg, transparent 50%, #e9edff 50%),
+    linear-gradient(135deg, #e9edff 50%, transparent 50%);
+  background-position:
+    0 0,
+    calc(100% - 20px) 18px,
+    calc(100% - 14px) 18px;
+  background-size:
+    100% 100%,
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+}
+
+.create-room-panel .lobby-field select:focus {
+  border-color: rgba(124, 247, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(124, 247, 255, 0.12);
+}
+
+.create-room-panel .lobby-field select option {
+  background: #161a35;
+  color: #e9edff;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.create-room-panel .lobby-actions {
+  justify-content: center;
+}
+
+.create-room-submit-button {
+  width: 140px;
+}
+
 .private-room-code-panel {
   position: relative;
   width: min(340px, 100%);

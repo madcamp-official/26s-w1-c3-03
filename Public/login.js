@@ -6,7 +6,9 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
-  signInAnonymously
+  signInAnonymously,
+  deleteUser,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import {
@@ -539,6 +541,48 @@ export async function deleteMailboxNotice(userId, noticeId) {
   const cleanNoticeId = String(noticeId || "").trim();
   if (!cleanUserId || !cleanNoticeId) throw new Error("Missing notice data.");
   await deleteDoc(doc(db, "User", cleanUserId, "Mailbox", cleanNoticeId));
+}
+
+async function deleteUserSubcollection(userId, subcollectionName) {
+  const snapshot = await getDocs(collection(db, "User", userId, subcollectionName));
+  await Promise.all(snapshot.docs.map((itemDoc) => deleteDoc(itemDoc.ref)));
+}
+
+export async function deleteGuestAccount(userId) {
+  const cleanUserId = String(userId || "").trim();
+  if (!cleanUserId) throw new Error("Missing guest user id.");
+
+  const userDocRef = doc(db, "User", cleanUserId);
+  const userDoc = await getDoc(userDocRef);
+  if (!userDoc.exists()) return;
+
+  const userData = userDoc.data();
+  if (!userData.isGuest) {
+    throw new Error("Only guest accounts can be deleted from logout.");
+  }
+
+  const friendsSnapshot = await getDocs(collection(db, "User", cleanUserId, "Friends"));
+  await Promise.all(friendsSnapshot.docs.map((friendDoc) => {
+    const friendData = friendDoc.data();
+    const friendUserId = friendData.fd_id || friendData.userId || friendDoc.id;
+    return deleteDoc(doc(db, "User", friendUserId, "Friends", cleanUserId));
+  }));
+
+  await Promise.all([
+    deleteUserSubcollection(cleanUserId, "Friends"),
+    deleteUserSubcollection(cleanUserId, "Mailbox")
+  ]);
+
+  await deleteDoc(userDocRef);
+
+  if (auth.currentUser?.uid === cleanUserId) {
+    try {
+      await deleteUser(auth.currentUser);
+    } catch (error) {
+      console.warn("Could not delete anonymous auth user:", error);
+      await signOut(auth);
+    }
+  }
 }
 
 export async function checkIdDuplicate(user_id) {

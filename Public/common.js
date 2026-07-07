@@ -698,6 +698,7 @@ function setLobbyStatus(message) {
 
 function renderLobbyUser() {
   // Paint the temporary logged-in user box from mock data.
+  document.body.classList.toggle("is-guest-user", Boolean(mockCurrentUser.isGuest));
   setProfileImage(els.lobbyProfileImage, mockCurrentUser.profileImage);
   if (els.lobbyNickname) els.lobbyNickname.textContent = mockCurrentUser.nickname;
   if (els.lobbyRankingPoint) els.lobbyRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
@@ -708,6 +709,14 @@ function renderLobbyUser() {
   if (els.friendsNickname) els.friendsNickname.textContent = mockCurrentUser.nickname;
   if (els.friendsRankingPoint) els.friendsRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
   if (els.nicknameInput) els.nicknameInput.value = mockCurrentUser.nickname;
+  if (els.openCreateRoomButton) els.openCreateRoomButton.hidden = Boolean(mockCurrentUser.isGuest);
+  [
+    els.lobbyUserInfoButton,
+    els.rankingUserInfoButton,
+    els.friendsUserInfoButton
+  ].forEach((button) => {
+    if (button) button.disabled = Boolean(mockCurrentUser.isGuest);
+  });
 }
 
 function escapeHtml(value) {
@@ -788,8 +797,12 @@ function currentTitle() {
 }
 
 function roomLevelLabel(level) {
-  const count = Number(level) || 1;
-  return `${count} color${count === 1 ? "" : "s"}`;
+  return {
+    1: "Easy",
+    2: "Normal",
+    3: "Hard",
+    4: "Extreme"
+  }[Number(level)] || "Easy";
 }
 
 function renderRoomList() {
@@ -1721,6 +1734,10 @@ function currentNickname() {
 function openCreateRoomModal() {
   // Show the create-room popup and provide a friendly default room name.
   if (!els.createRoomLayer) return;
+  if (mockCurrentUser.isGuest) {
+    setLobbyStatus("Guests cannot create rooms.");
+    return;
+  }
   els.createRoomNameInput.value = `${currentNickname()}'s room`;
   els.createRoomCodeInput.value = "";
   els.createRoomLayer.hidden = false;
@@ -1812,6 +1829,12 @@ function createRoomFromLobby() {
     A blank room code creates a public room. A non-blank room code creates a
     private room that other users must enter before joining.
   */
+  if (mockCurrentUser.isGuest) {
+    setLobbyStatus("Guests cannot create rooms.");
+    closeCreateRoomModal();
+    return;
+  }
+
   if (!socket) {
     setLobbyStatus("Open this page through the Node server to use rooms.");
     return;
@@ -2847,7 +2870,9 @@ renderLobbyUser();
 updateMailboxUnreadDots();
 els.openCreateRoomButton.addEventListener("click", openCreateRoomModal);
 els.closeCreateRoomButton.addEventListener("click", closeCreateRoomModal);
-els.cancelCreateRoomButton.addEventListener("click", closeCreateRoomModal);
+if (els.cancelCreateRoomButton) {
+  els.cancelCreateRoomButton.addEventListener("click", closeCreateRoomModal);
+}
 els.createRoomButton.addEventListener("click", createRoomFromLobby);
 els.closePrivateRoomCodeButton.addEventListener("click", closePrivateRoomCodeModal);
 els.submitPrivateRoomCodeButton.addEventListener("click", submitPrivateRoomCode);
@@ -2910,6 +2935,7 @@ document.addEventListener("click", () => {
 ].forEach((button) => {
   if (!button) return;
   button.addEventListener("click", () => {
+    if (mockCurrentUser.isGuest) return;
     openUserInfoModal();
   });
 });
@@ -2922,7 +2948,18 @@ document.addEventListener("click", () => {
   if (!button) return;
   button.addEventListener("click", async () => {
     closeProfileMenus();
-    await stopPresenceTracking();
+    try {
+      if (mockCurrentUser.isGuest) {
+        const { deleteGuestAccount } = await import(LOGIN_MODULE_URL);
+        await deleteGuestAccount(mockCurrentUser.id);
+      } else {
+        await stopPresenceTracking();
+      }
+    } catch (error) {
+      console.error("Logout cleanup failed:", error);
+      alert(error.message || "로그아웃 처리 중 문제가 발생했습니다.");
+      return;
+    }
     clearLoginSession();
     window.location.href = LOGIN_PAGE_URL;
   });
