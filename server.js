@@ -103,6 +103,65 @@ function cleanProfileImagePath(rawPath) {
   return filePath;
 }
 
+function storagePathFromProfileImage(profileImage) {
+  /*
+    The profile_image field can contain a few shapes from different versions:
+    - /api/profile-image-file?path=profile_images%2F...
+    - https://firebasestorage.googleapis.com/.../o/profile_images%2F...
+    - https://storage.googleapis.com/bucket/profile_images/...
+    - a raw profile_images/... path
+
+    Convert those back into a Firebase Storage path so the old file can be
+    deleted when a user uploads a replacement image.
+  */
+  const imageText = String(profileImage || "").trim();
+  if (!imageText) return "";
+
+  try {
+    const parsed = new URL(imageText, "http://localhost");
+    const pathParam = parsed.searchParams.get("path");
+    if (pathParam) return cleanProfileImagePath(pathParam);
+
+    const firebaseObjectMatch = parsed.pathname.match(/\/o\/([^/]+)/);
+    if (firebaseObjectMatch) {
+      return cleanProfileImagePath(decodeURIComponent(firebaseObjectMatch[1]));
+    }
+
+    if (adminBucket && parsed.hostname === "storage.googleapis.com") {
+      const bucketPrefix = `/${adminBucket.name}/`;
+      if (parsed.pathname.startsWith(bucketPrefix)) {
+        return cleanProfileImagePath(decodeURIComponent(parsed.pathname.slice(bucketPrefix.length)));
+      }
+    }
+  } catch (_error) {
+    // Fall through and check whether the value is already a raw Storage path.
+  }
+
+  return cleanProfileImagePath(imageText);
+}
+
+async function deletePreviousProfileImage(previousProfileImage, userId, newFilePath) {
+  /*
+    Delete only files that look like this user's uploaded profile images.
+    This prevents accidental deletion of shared/default assets or another
+    user's image if bad data ever appears in Firestore.
+  */
+  const previousPath = storagePathFromProfileImage(previousProfileImage);
+  const userProfilePrefix = `profile_images/${userId}_`;
+
+  if (!previousPath || previousPath === newFilePath || !previousPath.startsWith(userProfilePrefix)) {
+    return;
+  }
+
+  try {
+    const previousFile = adminBucket.file(previousPath);
+    const [exists] = await previousFile.exists();
+    if (exists) await previousFile.delete();
+  } catch (error) {
+    console.warn("Previous profile image delete failed:", previousPath, error);
+  }
+}
+
 /*
   Central game settings.
 
@@ -224,6 +283,10 @@ app.post("/api/profile-image", upload.single("profileImage"), async (req, res) =
       return res.status(400).json({ error: "Please upload a JPG, PNG, WEBP, or GIF image." });
     }
 
+    const userDocRef = adminDb.collection("User").doc(userId);
+    const userDoc = await userDocRef.get();
+    const previousProfileImage = userDoc.exists ? userDoc.data().profile_image : "";
+
     const extension = allowedTypes.get(file.mimetype);
     const token = crypto.randomUUID();
     const filePath = `profile_images/${userId}_${Date.now()}.${extension}`;
@@ -241,9 +304,11 @@ app.post("/api/profile-image", upload.single("profileImage"), async (req, res) =
 
     const profileImageUrl = profileImageProxyUrl(filePath);
 
-    await adminDb.collection("User").doc(userId).update({
+    await userDocRef.update({
       profile_image: profileImageUrl
     });
+
+    await deletePreviousProfileImage(previousProfileImage, userId, filePath);
 
     res.json({
       profileImage: profileImageUrl
