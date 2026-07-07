@@ -1,5 +1,5 @@
-/* Lobby screen: players join a room here before the real-time game starts. */
-.lobby-screen {
+/* Game waiting screen: shown after a player joins a room and before the board starts. */
+.game-waiting-screen {
   position: relative;
   width: 100%;
   min-height: 700px;
@@ -16,7 +16,7 @@
   backdrop-filter: blur(18px);
 }
 
-.lobby-card {
+.game-waiting-card {
   width: 100%;
   min-height: 640px;
   display: grid;
@@ -28,15 +28,7 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.09);
 }
 
-.lobby-title {
-  margin: 0;
-  font-size: clamp(30px, 4vw, 44px);
-  line-height: 1;
-  font-weight: 950;
-  text-shadow: 0 0 26px rgba(75, 125, 255, 0.38);
-}
-
-.lobby-status,
+.game-status,
 .waiting-room-meta {
   min-height: 21px;
   margin: 0;
@@ -45,495 +37,21 @@
   font-weight: 700;
 }
 
-.main-lobby-panel,
-.ranking-page-panel,
-.friends-page-panel,
 .waiting-lobby-panel {
   position: relative;
   display: grid;
   gap: 14px;
 }
 
-.main-lobby-panel,
-.ranking-page-panel,
-.friends-page-panel {
-  min-height: 580px;
-}
-
-.lobby-top-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.lobby-nav-button {
-  position: relative;
-  min-height: 36px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.08);
-  color: #e9edff;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.lobby-nav-button:hover {
-  background: rgba(255,255,255,0.14);
-}
-
-.lobby-nav-button:disabled {
-  opacity: 0.42;
-  cursor: default;
-  background: rgba(255,255,255,0.05);
-}
-
-.lobby-nav-button.has-unread-mail::after {
-  content: "";
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 0 2px rgba(15, 18, 40, 0.92);
-}
-
-.lobby-home-button {
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-}
-
-.lobby-home-button:disabled {
-  cursor: default;
-  opacity: 0.34;
-}
-
-.lobby-home-button:not(:disabled):hover {
-  opacity: 0.72;
-}
-
-.lobby-home-icon {
-  width: 32px;
-  height: 32px;
-  display: block;
-  object-fit: contain;
-}
-
-.mailbox-close-button {
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-}
-
-.mailbox-close-button:hover {
-  opacity: 0.72;
-}
-
-.mailbox-close-icon {
-  width: 30px;
-  height: 30px;
-  display: block;
-  object-fit: contain;
-}
-
-.friends-action-row {
-  position: absolute;
-  top: 48px;
-  right: 0;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.friends-add-button {
-  min-width: 118px;
-}
-
-.friends-delete-mode-button {
-  min-width: 112px;
-  opacity: 0.78;
-}
-
-.friends-delete-mode-button.is-active {
-  border-color: rgba(255, 76, 100, 0.62);
-  background: rgba(255, 76, 100, 0.18);
-  color: #ffd5dc;
-  opacity: 1;
-}
-
-.lobby-main-layout {
-  height: 100%;
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 22px;
-  align-items: stretch;
-}
-
-.lobby-left-rail {
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  align-content: start;
-  gap: 14px;
-  min-width: 0;
-}
-
-.lobby-profile-box {
-  min-height: 104px;
-  display: grid;
-  grid-template-columns: 70px minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.07);
-  cursor: pointer;
-}
-
-.lobby-profile-box:hover,
-.lobby-profile-box:focus-visible {
-  border-color: rgba(124, 247, 255, 0.45);
-  background: rgba(255,255,255,0.10);
-  outline: none;
-}
-
-.lobby-profile-image {
-  width: 70px;
-  height: 70px;
-  display: block;
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 8px;
-  object-fit: cover;
-  background: rgba(255,255,255,0.10);
-}
-
-.lobby-profile-text {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.lobby-profile-name {
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 950;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lobby-profile-rp {
-  color: #7cf7ff;
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.profile-action-menu {
-  display: grid;
-  gap: 8px;
-}
-
-.profile-action-menu[hidden] {
-  display: none;
-}
-
-.profile-action-button {
-  width: 100%;
-  min-height: 38px;
-  padding: 9px 12px;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.08);
-  color: #e9edff;
-  font-size: 13px;
-  font-weight: 900;
-  text-align: left;
-}
-
-.profile-action-button:hover {
-  border-color: rgba(124, 247, 255, 0.38);
-  background: rgba(255,255,255,0.14);
-}
-
-.lobby-hidden-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.lobby-create-button {
-  width: 100%;
-}
-
-.lobby-room-panel {
-  min-height: 540px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 14px;
-  padding-top: 52px;
-  min-width: 0;
-}
-
-.lobby-room-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.ranking-panel,
-.friends-panel {
-  min-height: 540px;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 14px;
-  padding-top: 52px;
-  min-width: 0;
-}
-
-.ranking-table-wrap,
-.friends-table-wrap {
-  min-height: 420px;
-  overflow-x: auto;
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.045);
-}
-
-.ranking-table,
-.friends-table {
-  width: 100%;
-  min-width: 560px;
-  border-collapse: collapse;
-  color: #e9edff;
-  font-size: 14px;
-  font-weight: 800;
-  text-align: left;
-}
-
-.ranking-table th,
-.ranking-table td,
-.friends-table th,
-.friends-table td {
-  padding: 14px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.10);
-  vertical-align: middle;
-}
-
-.ranking-table th,
-.friends-table th {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 950;
-  text-transform: uppercase;
-}
-
-.ranking-table tbody tr:last-child td,
-.friends-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.ranking-table tr.is-me,
-.friends-table tr.is-me {
-  background: rgba(124, 247, 255, 0.10);
-}
-
-.ranking-profile-image,
-.friends-profile-image {
-  width: 38px;
-  height: 38px;
-  display: block;
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 8px;
-  object-fit: cover;
-  background: rgba(255,255,255,0.08);
-}
-
-.friend-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #e9edff;
-}
-
-.friend-status-cell {
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.friend-status-dot {
-  width: 10px;
-  height: 10px;
-  display: inline-block;
-  border-radius: 50%;
-}
-
-.friend-status-dot.is-online {
-  background: #31e981;
-  box-shadow: 0 0 0 4px rgba(49, 233, 129, 0.12);
-}
-
-.friend-status-dot.is-offline {
-  background: #ff4c64;
-  box-shadow: 0 0 0 4px rgba(255, 76, 100, 0.12);
-}
-
-.friend-delete-button {
-  min-height: 28px;
-  padding: 0 9px;
-  border: 1px solid rgba(255, 76, 100, 0.42);
-  border-radius: 8px;
-  background: rgba(255, 76, 100, 0.12);
-  color: #ffd5dc;
-  font-size: 11px;
-  font-weight: 850;
-  white-space: nowrap;
-}
-
-.friend-delete-button:hover:not(:disabled) {
-  border-color: rgba(255, 76, 100, 0.72);
-  background: rgba(255, 76, 100, 0.2);
-}
-
-.friend-delete-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.mailbox-notice-list {
-  min-height: 300px;
-  max-height: 420px;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  padding: 10px;
-  overflow-y: auto;
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.045);
-}
-
-.mailbox-notice-empty {
-  min-height: 180px;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 800;
-  text-align: center;
-}
-
-.mailbox-notice-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
-}
-
-.mailbox-message-button {
-  min-height: 42px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
-  color: #e9edff;
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 1.35;
-  text-align: left;
-}
-
-.mailbox-message-button:hover {
-  border-color: rgba(124, 247, 255, 0.36);
-  background: rgba(255,255,255,0.12);
-}
-
-.mailbox-delete-button {
-  min-height: 42px;
-  padding: 9px 12px;
-  border: 1px solid rgba(255, 76, 100, 0.22);
-  border-radius: 8px;
-  background: rgba(255, 76, 100, 0.12);
-  color: #ffd8dd;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.mailbox-delete-button:hover {
-  background: rgba(255, 76, 100, 0.20);
-}
-
-.mailbox-detail-message {
-  margin: 0;
-  color: #e9edff;
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1.55;
-}
-
-.lobby-section-title {
+.game-section-title {
   margin: 0;
   color: var(--ink);
   font-size: 20px;
   font-weight: 900;
 }
 
-.lobby-field {
-  display: grid;
-  gap: 8px;
-  color: #dce2ff;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.lobby-field input,
-.lobby-field select {
-  min-height: 42px;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.08);
-  color: var(--ink);
-  outline: 0;
-}
-
-.lobby-field select option {
-  color: #111111;
-}
-
-.lobby-toolbar,
 .waiting-header,
-.create-room-header,
-.add-friend-header,
-.mailbox-header,
-.mailbox-detail-header,
-.lobby-actions {
+.invite-friend-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -541,8 +59,7 @@
   gap: 12px;
 }
 
-.lobby-button,
-.room-join-button {
+.game-button {
   min-height: 40px;
   padding: 10px 14px;
   border-radius: 8px;
@@ -553,156 +70,27 @@
   box-shadow: 0 10px 24px rgba(109, 124, 255, 0.24);
 }
 
-.lobby-button-secondary {
+.game-button-secondary {
   background: rgba(255,255,255,0.12);
   color: #dce2ff;
   box-shadow: none;
 }
 
-.lobby-button:disabled,
-.room-join-button:disabled {
+.game-button:disabled {
   opacity: 0.35;
   cursor: default;
   filter: grayscale(0.5);
   box-shadow: none;
 }
 
-.room-list {
-  min-height: 420px;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-}
-
-.room-list-header,
-.room-row {
-  display: grid;
-  grid-template-columns: 64px minmax(150px, 1.4fr) 90px 100px 90px;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
-}
-
-.room-list-header {
-  min-height: 36px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.room-row {
-  min-height: 50px;
-  color: #e9edff;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.room-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.room-private-mark {
-  margin-left: 6px;
-  color: #7cf7ff;
-  font-size: 12px;
-  font-weight: 950;
-}
-
-.room-empty {
-  min-height: 320px;
-  display: grid;
-  place-items: center;
-  border: 1px dashed rgba(255,255,255,0.18);
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.lobby-volume-control {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  z-index: 4;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-}
-
-.lobby-volume-button {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-}
-
-.lobby-volume-slider-wrap {
-  width: 44px;
-  height: 126px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
-  background: rgba(8, 10, 24, 0.76);
-}
-
-.lobby-volume-slider {
-  width: 104px;
-  height: 18px;
-  margin: 0;
-  appearance: none;
-  background: transparent;
-  cursor: pointer;
-  transform: rotate(-90deg);
-}
-
-.lobby-volume-slider::-webkit-slider-runnable-track {
-  height: 3px;
-  border-radius: 999px;
-  background: #ffffff;
-}
-
-.lobby-volume-slider::-webkit-slider-thumb {
-  width: 15px;
-  height: 15px;
-  margin-top: -6px;
-  appearance: none;
-  border: 0;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-.lobby-volume-slider::-moz-range-track {
-  height: 3px;
-  border-radius: 999px;
-  background: #ffffff;
-}
-
-.lobby-volume-slider::-moz-range-thumb {
-  width: 15px;
-  height: 15px;
-  border: 0;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-.lobby-player-list {
+.waiting-player-list {
   min-height: 120px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.lobby-player-item {
+.waiting-player-item {
   min-height: 72px;
   display: flex;
   align-items: center;
@@ -717,13 +105,13 @@
   font-weight: 800;
 }
 
-.lobby-player-item.is-empty-slot {
+.waiting-player-item.is-empty-slot {
   justify-content: center;
   border-style: dashed;
   background: rgba(255,255,255,0.035);
 }
 
-.invite-slot-button {
+.waiting-invite-slot-button {
   min-height: 38px;
   padding: 9px 12px;
   border: 1px solid rgba(124, 247, 255, 0.24);
@@ -734,11 +122,11 @@
   font-weight: 900;
 }
 
-.invite-slot-button:hover {
+.waiting-invite-slot-button:hover {
   background: rgba(124, 247, 255, 0.16);
 }
 
-.lobby-player-badge {
+.waiting-player-badge {
   color: #7cf7ff;
   font-size: 11px;
   font-weight: 950;
@@ -746,13 +134,7 @@
   text-transform: uppercase;
 }
 
-.create-room-layer,
-.private-room-code-layer,
-.add-friend-layer,
-.mailbox-layer,
-.user-info-layer,
-.invite-friend-layer,
-.mailbox-detail-layer {
+.invite-friend-layer {
   position: absolute;
   inset: 0;
   z-index: 40;
@@ -761,58 +143,6 @@
   padding: 28px;
   background: rgba(4, 6, 16, 0.45);
   backdrop-filter: blur(6px);
-}
-
-.create-room-panel {
-  position: relative;
-  width: min(520px, 100%);
-  display: grid;
-  gap: 18px;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(15, 18, 40, 0.98);
-  box-shadow: var(--shadow);
-}
-
-.private-room-code-panel {
-  position: relative;
-  width: min(340px, 100%);
-  display: grid;
-  gap: 16px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(15, 18, 40, 0.98);
-  box-shadow: var(--shadow);
-}
-
-.private-room-code-submit-button {
-  width: 100%;
-}
-
-.add-friend-panel {
-  position: relative;
-  width: min(360px, 100%);
-  display: grid;
-  gap: 16px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(15, 18, 40, 0.98);
-  box-shadow: var(--shadow);
-}
-
-.mailbox-panel {
-  position: relative;
-  width: min(560px, 100%);
-  display: grid;
-  gap: 14px;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(15, 18, 40, 0.98);
-  box-shadow: var(--shadow);
 }
 
 .invite-friend-panel {
@@ -825,130 +155,6 @@
   border-radius: 12px;
   background: rgba(15, 18, 40, 0.98);
   box-shadow: var(--shadow);
-}
-
-.user-info-panel {
-  position: relative;
-  width: min(620px, 100%);
-  display: grid;
-  gap: 18px;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(15, 18, 40, 0.98);
-  box-shadow: var(--shadow);
-}
-
-.user-info-close-button {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-}
-
-.user-info-close-button:hover {
-  opacity: 0.72;
-}
-
-.user-info-close-icon {
-  width: 30px;
-  height: 30px;
-  display: block;
-  object-fit: contain;
-}
-
-.user-info-title {
-  padding-right: 48px;
-}
-
-.user-info-profile-area {
-  justify-self: center;
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-}
-
-.user-info-main-image {
-  width: 132px;
-  height: 132px;
-  display: block;
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 8px;
-  object-fit: cover;
-  background: rgba(255,255,255,0.10);
-}
-
-.user-info-image-edit-button {
-  width: 170px;
-  text-align: center;
-}
-
-.user-info-table {
-  width: 100%;
-  border-collapse: collapse;
-  color: #e9edff;
-  font-size: 14px;
-  font-weight: 850;
-}
-
-.user-info-table th,
-.user-info-table td {
-  padding: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.10);
-  vertical-align: middle;
-}
-
-.user-info-table th {
-  width: 120px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 950;
-  text-align: left;
-  text-transform: uppercase;
-}
-
-.user-info-table td:last-child {
-  width: 96px;
-}
-
-.user-info-input {
-  width: 100%;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.08);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 850;
-  outline: 0;
-}
-
-.user-info-input:disabled {
-  opacity: 0.82;
-}
-
-.user-info-edit-button {
-  min-width: 72px;
-  text-align: center;
-}
-
-.user-info-save-button {
-  justify-self: center;
-  min-width: 140px;
-}
-
-.invite-friend-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 .invite-friend-close-button {
@@ -1035,123 +241,6 @@
   text-align: center;
 }
 
-.mailbox-detail-panel {
-  position: relative;
-  width: min(430px, 100%);
-  display: grid;
-  gap: 16px;
-  padding: 22px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(15, 18, 40, 0.98);
-  box-shadow: var(--shadow);
-}
-
-.mailbox-detail-content {
-  display: grid;
-  gap: 16px;
-}
-
-.mailbox-detail-user {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  padding: 12px;
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.06);
-}
-
-.mailbox-detail-profile {
-  width: 72px;
-  height: 72px;
-  display: block;
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 8px;
-  object-fit: cover;
-  background: rgba(255,255,255,0.08);
-}
-
-.mailbox-detail-user-text {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.mailbox-detail-name {
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 950;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mailbox-detail-rp {
-  color: #7cf7ff;
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.mailbox-detail-room {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  background: rgba(255,255,255,0.045);
-}
-
-.mailbox-detail-room-row {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 12px;
-  color: #e9edff;
-  font-size: 14px;
-  font-weight: 850;
-}
-
-.mailbox-detail-room-label {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 950;
-  text-transform: uppercase;
-}
-
-.mailbox-detail-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.mailbox-detail-action {
-  min-height: 40px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.mailbox-detail-action.is-accept {
-  background: #31bf72;
-}
-
-.mailbox-detail-action.is-reject {
-  background: rgba(255, 76, 100, 0.86);
-}
-
-.add-friend-submit-button {
-  width: 100%;
-}
-
-.create-room-form {
-  display: grid;
-  gap: 12px;
-}
-
-/* Main in-game board. It is hidden while the lobby is active. */
 .game-board {
   position: relative;
   min-height: 700px;
@@ -1206,7 +295,6 @@
   padding: 4px 58px 6px 2px;
 }
 
-.eyebrow,
 .modal-kicker,
 .card-label,
 .round-caption {
@@ -1274,8 +362,8 @@
 
 .volume-control {
   position: absolute;
-  right: 33px;
-  bottom: 45px;
+  right: 40px;
+  bottom: 40px;
   z-index: 12;
   display: flex;
   align-items: center;
@@ -1295,14 +383,6 @@
 
 .volume-button:hover {
   transform: translateY(-2px);
-}
-
-.volume-icon {
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-  display: block;
-  pointer-events: none;
 }
 
 .volume-slider-wrap {
@@ -2382,119 +1462,20 @@ input.value-box:focus {
   }
 }
 
-@media (max-width: 760px) {
-  .lobby-screen {
+@media (max-width: 780px) {
+  .game-waiting-screen {
     min-height: auto;
     padding: 20px;
     border-radius: 26px;
   }
 
-  .lobby-card {
+  .game-waiting-card {
     min-height: auto;
     padding: 24px;
   }
 
-  .main-lobby-panel,
-  .ranking-page-panel,
-  .friends-page-panel {
-    min-height: auto;
-  }
-
-  .lobby-top-actions {
-    position: static;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
-  }
-
-  .lobby-main-layout {
+  .waiting-player-list {
     grid-template-columns: 1fr;
-  }
-
-  .lobby-room-panel,
-  .ranking-panel,
-  .friends-panel {
-    min-height: auto;
-    padding-top: 0;
-  }
-
-  .mailbox-notice-row {
-    grid-template-columns: 1fr;
-  }
-
-  .mailbox-delete-button {
-    justify-self: stretch;
-  }
-
-  .user-info-panel {
-    padding: 20px;
-  }
-
-  .user-info-table,
-  .user-info-table tbody,
-  .user-info-table tr,
-  .user-info-table th,
-  .user-info-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .user-info-table tr {
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.10);
-  }
-
-  .user-info-table th,
-  .user-info-table td {
-    padding: 4px 0;
-    border-bottom: 0;
-  }
-
-  .user-info-edit-button {
-    width: 100%;
-  }
-
-  .friends-action-row {
-    position: static;
-    justify-self: start;
-    margin-bottom: 8px;
-  }
-
-  .lobby-room-heading {
-    display: grid;
-    align-items: start;
-  }
-
-  .room-list {
-    min-height: 260px;
-  }
-
-  .room-empty {
-    min-height: 180px;
-  }
-
-  .lobby-volume-control {
-    left: auto;
-    right: 0;
-    bottom: 0;
-  }
-
-  .lobby-form,
-  .lobby-player-list {
-    grid-template-columns: 1fr;
-  }
-
-  .room-list-header {
-    display: none;
-  }
-
-  .room-row {
-    grid-template-columns: 48px minmax(0, 1fr);
-  }
-
-  .room-join-button {
-    grid-column: 1 / -1;
-    justify-self: stretch;
   }
 
   .game-board {

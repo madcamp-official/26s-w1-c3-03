@@ -7,7 +7,6 @@
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.09);
 }
 
-.main-title-box h1,
 .container h2 {
   margin: 0 0 24px;
   text-align: center;
@@ -15,14 +14,29 @@
   font-weight: 950;
 }
 
+.main-title-box{
+  display: flex;
+  justify-content: center;
+}
+
+.main-logo {
+  width: 150px;
+  height: 150px;
+  margin: 10px;
+}
+
 .main-btn-group,
 .input-group {
   display: grid;
-  gap: 10px;
+  gap: 5px;
 }
 
 .input-group {
-  margin: 14px 0;
+  margin-bottom: 14px;
+}
+
+.input-group.secondary {
+  margin: 0px;
 }
 
 .input-group label,
@@ -62,10 +76,11 @@ button,
   min-height: 42px;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.16);
   background: linear-gradient(135deg, var(--blue), #6f50ff);
   color: #fff;
-  font-weight: 900;
+  font-weight: 950;
+  font-size: 18px;
+  margin: 5px;
 }
 
 .btn-secondary {
@@ -74,7 +89,8 @@ button,
 }
 
 .btn-google {
-  background: rgba(255,255,255,0.16);
+  /* background: linear-gradient(135deg, var(--purple), #ff50c2); */
+  background: linear-gradient(135deg, #6f50ff, rgba(255, 71, 169, 0.716));
 }
 
 .toggle-link,
@@ -83,4 +99,101 @@ button,
   margin-top: 16px;
   text-align: center;
   cursor: pointer;
+}
+
+.login-btn-group {
+  display: flex;
+  justify-content: center;
+}
+
+/* 반투명/투명 배경을 유지하기 위한 코드 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    /* 그림자로 덮는 대신, 브라우저가 배경색을 바꾸는 시간을 5000초로 지연시킵니다 */
+    transition: background-color 5000s ease-in-out 0s !important;
+    
+    /* 글자색은 설정하신 CSS 변수 그대로 유지 */
+    -webkit-text-fill-color: var(--ink) !important; 
+}
+
+/* -------------------------------------------
+   입력창과 버튼 가로 정렬 스타일
+------------------------------------------- */
+.input-with-btn {
+  display: flex;
+  gap: 8px; /* 입력창과 버튼 사이의 간격 */
+  align-items: stretch; /* 입력창과 버튼의 높이를 동일하게 맞춤 */
+}
+
+.input-with-btn input {
+  flex: 1; /* 입력창이 남는 공간을 모두 차지하도록 설정 */
+}
+
+.input-with-btn .btn-secondary {
+  margin: 0; /* 기존에 설정된 바깥 여백 제거 */
+  min-width: 80px; /* 버튼이 너무 찌그러지지 않게 최소 너비 설정 */
+  white-space: nowrap; /* 버튼 안의 글자가 줄바꿈되지 않게 방지 */
+}
+
+/* -------------------------------------------
+   버튼 비활성화(Disabled) 상태 스타일
+------------------------------------------- */
+button:disabled,
+.primary-btn:disabled,
+.btn-secondary:disabled {
+  /* 그라데이션 대신 어둡고 반투명한 단색 배경으로 변경 */
+  background: rgba(255, 255, 255, 0.1) !important; 
+  /* 글자색을 흐리게 변경 */
+  color: rgba(255, 255, 255, 0.4) !important; 
+  /* 마우스를 올렸을 때 클릭 금지 커서 표시 */
+  cursor: not-allowed !important; 
+  /* 기존 그림자 효과 제거 */
+  box-shadow: none !important; 
+}
+
+.profile-area {
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.profile-image {
+  width: 132px;
+  height: 132px;
+  display: block;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255,255,255,0.10);
+}
+
+.profile-image.default-img {
+  padding: 10px;
+}
+
+.profile-action-button {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  color: #e9edff;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.profile-action-button:hover {
+  border-color: rgba(124, 247, 255, 0.38);
+  background: rgba(255,255,255,0.14);
+}
+
+.choice-image-button {
+  width: 170px;
+  text-align: center;
 }

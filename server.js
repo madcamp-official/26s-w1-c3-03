@@ -1086,7 +1086,8 @@ io.on("connection", (socket) => {
 
 const PORT = Number(process.env.PORT) || 3000;
 
-server.listen(PORT, () => {
-  // Start listening for browser requests and socket connections.
+server.listen(PORT, "0.0.0.0", () => {
+  // 0.0.0.0 allows other devices on the same network to connect to this server.
   console.log(`RGB Guess server running at http://localhost:${PORT}`);
+  console.log(`Same-network devices can connect with http://YOUR_PC_IPV4:${PORT}`);
 });

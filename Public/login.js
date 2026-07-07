@@ -64,9 +64,25 @@ function saveCurrentUserSession(uid, userData, loginType) {
 }
 
 // ---------------------------------------------------
-// 1. 일반 이메일 회원가입 (비밀번호 조건 추가)
+// 1. 일반 이메일 회원가입
 // ---------------------------------------------------
 export async function signUpWithEmail(email, password, user_id, nickname, profileFile = null) {
+  // 1. 아이디 유효성 검사 (영문, 숫자만 1자 이상)
+  const idRegex = /^[a-zA-Z0-9]+$/;
+  if (!idRegex.test(user_id)) {
+    alert("아이디는 영문과 숫자만 사용할 수 있습니다.");
+    return false; // 실패했음을 알림
+  }
+
+  // 2. 닉네임 유효성 검사 (2~12자, 한글, 영문, 숫자만)
+  // '가-힣'은 완성형 한글을 의미하며, 자음/모음 단독(ㄱ, ㅏ 등)은 제외됩니다.
+  const nicknameRegex = /^[a-zA-Z0-9가-힣]{2,12}$/;
+  if (!nicknameRegex.test(nickname)) {
+    alert("닉네임은 2~12자이며, 한글, 영문, 숫자만 사용할 수 있습니다.");
+    return false; // 실패했음을 알림
+  }
+
+  // 3. 비밀번호 유효성 검사 (기존 코드)
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasNumber = /\d/.test(password);
   const hasSpecial = /[!@#$%^&*()_+~\-={}\[\]:;"'<>,.?/|\\]/.test(password);
@@ -121,7 +137,7 @@ export async function loginWithGoogle() {
     const userDocSnap = await getDoc(userDocRef);
 
     if (!userDocSnap.exists()) {
-      // 🚨 신규 유저: DB를 생성하지 않고, 프론트엔드 폼에 채워넣을 정보만 반환!
+      // 신규 유저: DB를 생성하지 않고, 프론트엔드 폼에 채워넣을 정보만 반환!
       console.log("신규 구글 유저입니다. 추가 정보 입력이 필요합니다.");
       return {
         isNewUser: true,
@@ -207,10 +223,6 @@ export async function login(user_id, password) {
       ...userData,
       email: userCredential.user.email
     }, "email");
-    
-    // (참고: userCredential.user 안에는 user_id가 없습니다. uid나 email을 출력해야 합니다)
-    console.log("로그인 성공! 로그인된 이메일:", userCredential.user.email);
-    alert("로그인에 성공했습니다!");
 
     return true;
 

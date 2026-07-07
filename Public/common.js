@@ -97,6 +97,17 @@ function normalizeProfileImage(profileImage) {
   return image;
 }
 
+function isDefaultProfileImage(profileImage) {
+  const image = String(profileImage || "").trim();
+  return !image || image === "profile.png" || image === DEFAULT_PROFILE_IMAGE;
+}
+
+function setProfileImage(element, profileImage) {
+  if (!element) return;
+  element.src = normalizeProfileImage(profileImage);
+  element.classList.toggle("is-default-profile", isDefaultProfileImage(profileImage));
+}
+
 function normalizeLoggedInUser(user) {
   /*
     login.js saves the real Firebase/Firestore user in sessionStorage.
@@ -162,13 +173,18 @@ function refreshVisibleFriendPresence() {
   loadFriendsFromDb(true);
 }
 
+function refreshMailboxNotifications() {
+  loadMailboxNoticesFromDb(false);
+}
+
 function startPresenceTracking() {
   if (!currentUserFromSession || presenceTimer) return;
   updateCurrentUserPresence(true);
   presenceTimer = setInterval(() => {
     updateCurrentUserPresence(true);
     refreshVisibleFriendPresence();
-  }, 30000);
+    refreshMailboxNotifications();
+  }, 10000);
 }
 
 function stopPresenceTracking() {
@@ -284,6 +300,7 @@ let leaderboardUsers = [];
 let leaderboardLoaded = false;
 let leaderboardLoading = false;
 let leaderboardLoadPromise = null;
+let rankingMode = "all";
 
 let friends = [];
 let friendsLoaded = false;
@@ -291,117 +308,33 @@ let friendsLoading = false;
 let friendsLoadPromise = null;
 let friendDeleteMode = false;
 
-function createMockMailboxNotices() {
-  /*
-    Temporary mailbox notices for screen development.
-    Type "friend" means a friend request; type "invite" means a game invite.
-  */
-  const senders = ["Aster421", "Milo208", "Rin774", "Sora315", "Luna902"];
-  const roomNames = ["Sunset RGB", "Prism Lab", "Quick Match", "Color Sprint", "Hue Arena"];
-  const now = Date.now();
-  return senders.map((sender, index) => {
-    const friendRequest = false;
-    const hue = (index * 59 + 120) % 360;
-    const level = (index % 4) + 1;
-    const maxPlayers = 2 + (index % 4);
-    const currentPlayers = Math.min(maxPlayers, 1 + (index % maxPlayers));
-    return {
-      id: `mock_notice_${index}`,
-      type: friendRequest ? "friend" : "invite",
-      sender,
-      createdAt: now - (senders.length - index) * 1000,
-      profileImage: createMockProfileImage(sender, hue),
-      rankingPoint: 700 + index * 330,
-      message: friendRequest
-        ? `"${sender}" has sent you a friend request.`
-        : `"${sender}" has invited you to a game.`,
-      fullMessage: friendRequest
-        ? `"${sender}" has sent you a friend request. Friend request accept/decline actions will be connected later.`
-        : `"${sender}" has invited you to a game. Game invite join/decline actions will be connected later.`,
-      room: friendRequest
-        ? null
-        : {
-          name: roomNames[index],
-          level,
-          currentPlayers,
-          maxPlayers
-        }
-    };
-  });
-}
-
-function normalizeMockMailboxNotice(notice, index) {
-  // Fill fields added after older sessionStorage mailbox data was created.
-  const sender = notice?.sender || `User${index + 1}`;
-  const type = notice?.type === "invite" ? "invite" : "friend";
-  const hue = (index * 59 + 120) % 360;
-  const level = Number(notice?.room?.level) || ((index % 4) + 1);
-  const maxPlayers = Number(notice?.room?.maxPlayers) || (2 + (index % 4));
-  const currentPlayers = Number(notice?.room?.currentPlayers) || Math.min(maxPlayers, 1 + (index % maxPlayers));
-  return {
-    id: notice?.id || `mock_notice_${index}`,
-    type,
-    sender,
-    createdAt: Number(notice?.createdAt) || Date.now() - (index + 1) * 1000,
-    profileImage: notice?.profileImage || createMockProfileImage(sender, hue),
-    rankingPoint: Number(notice?.rankingPoint) || (700 + index * 330),
-    message: notice?.message || (type === "friend"
-      ? `"${sender}" has sent you a friend request.`
-      : `"${sender}" has invited you to a game.`),
-    fullMessage: notice?.fullMessage || (type === "friend"
-      ? `"${sender}" has sent you a friend request.`
-      : `"${sender}" has invited you to a game.`),
-    room: type === "invite"
-      ? {
-        name: notice?.room?.name || "Quick Match",
-        level,
-        currentPlayers,
-        maxPlayers
-      }
-      : null
-  };
-}
-
 function loadMockMailboxNotices() {
-  try {
-    const storedNotices = sessionStorage.getItem("colorMasterMockMailbox");
-    if (storedNotices) {
-      const notices = JSON.parse(storedNotices)
-        .map(normalizeMockMailboxNotice)
-        .filter((notice) => notice.type !== "friend");
-      sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(notices));
-      return notices;
-    }
-  } catch (_error) {
-    // Fall through and create fresh mailbox data if stored data is invalid.
-  }
-
-  const notices = createMockMailboxNotices();
-  sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(notices));
-  return notices;
+  sessionStorage.removeItem("colorMasterMockMailbox");
+  return [];
 }
 
 function saveMockMailboxNotices() {
-  const localOnlyNotices = mockMailboxNotices.filter((notice) => notice.source !== "db");
-  sessionStorage.setItem("colorMasterMockMailbox", JSON.stringify(localOnlyNotices));
+  sessionStorage.removeItem("colorMasterMockMailbox");
 }
 
 let mockMailboxNotices = loadMockMailboxNotices();
 let mailboxLoading = false;
 let mailboxLoadPromise = null;
 
-const MAILBOX_LAST_SEEN_KEY = "colorMasterMailboxLastSeenAt";
+const MAILBOX_READ_IDS_KEY = "colorMasterMailboxReadNoticeIds";
 
-function latestMailboxTimestamp() {
-  // New-mail checks compare the newest notice timestamp to the last mailbox-open time.
-  return mockMailboxNotices.reduce((latest, notice) => {
-    return Math.max(latest, Number(notice.createdAt) || 0);
-  }, 0);
+function mailboxReadIds() {
+  try {
+    const storedIds = JSON.parse(sessionStorage.getItem(MAILBOX_READ_IDS_KEY) || "[]");
+    return new Set(Array.isArray(storedIds) ? storedIds : []);
+  } catch (_error) {
+    return new Set();
+  }
 }
 
 function hasUnreadMailboxNotices() {
-  const lastSeenAt = Number(sessionStorage.getItem(MAILBOX_LAST_SEEN_KEY)) || 0;
-  return latestMailboxTimestamp() > lastSeenAt;
+  const readIds = mailboxReadIds();
+  return mockMailboxNotices.some((notice) => !readIds.has(String(notice.id)));
 }
 
 function updateMailboxUnreadDots() {
@@ -418,32 +351,32 @@ function updateMailboxUnreadDots() {
   });
 }
 
-function markMailboxAsSeen() {
-  sessionStorage.setItem(MAILBOX_LAST_SEEN_KEY, String(Math.max(Date.now(), latestMailboxTimestamp())));
+function markMailboxNoticeAsRead(noticeId) {
+  const cleanNoticeId = String(noticeId || "").trim();
+  if (!cleanNoticeId) return;
+  const readIds = mailboxReadIds();
+  readIds.add(cleanNoticeId);
+  sessionStorage.setItem(MAILBOX_READ_IDS_KEY, JSON.stringify([...readIds]));
   updateMailboxUnreadDots();
 }
 
 async function loadMailboxNoticesFromDb(force = false) {
   if (!mockCurrentUser.id) return mockMailboxNotices;
   if (mailboxLoadPromise) return mailboxLoadPromise;
-  if (!force && mockMailboxNotices.some((notice) => notice.source === "db")) return mockMailboxNotices;
 
   mailboxLoading = true;
-  renderMailboxNotices();
-  if (els.mailboxStatus) els.mailboxStatus.textContent = "Loading notices...";
+  const showLoadingState = force || (els.mailboxLayer && !els.mailboxLayer.hidden && !mockMailboxNotices.length);
+  if (showLoadingState) renderMailboxNotices();
+  if (els.mailboxStatus) els.mailboxStatus.textContent = "";
 
   mailboxLoadPromise = import(LOGIN_MODULE_URL)
     .then(({ getMailboxNotices }) => getMailboxNotices(mockCurrentUser.id))
     .then((dbNotices) => {
-      const localNotices = mockMailboxNotices.filter((notice) => notice.source !== "db");
-      mockMailboxNotices = [...dbNotices, ...localNotices]
+      mockMailboxNotices = dbNotices
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
       renderMailboxNotices();
       updateMailboxUnreadDots();
-      markMailboxAsSeen();
-      if (els.mailboxStatus) els.mailboxStatus.textContent = mockMailboxNotices.length
-        ? "Click a message to read the full notice."
-        : "No notices.";
+      if (els.mailboxStatus) els.mailboxStatus.textContent = "";
       return mockMailboxNotices;
     })
     .catch((error) => {
@@ -641,6 +574,8 @@ const els = {
   rankingFriendsButton: byId("rankingFriendsButton"),
   rankingMailboxButton: byId("rankingMailboxButton"),
   rankingHomeButton: byId("rankingHomeButton"),
+  allRankingTabButton: byId("allRankingTabButton"),
+  friendRankingTabButton: byId("friendRankingTabButton"),
   rankingProfileBox: byId("rankingProfileBox"),
   rankingProfileMenu: byId("rankingProfileMenu"),
   rankingUserInfoButton: byId("rankingUserInfoButton"),
@@ -763,13 +698,13 @@ function setLobbyStatus(message) {
 
 function renderLobbyUser() {
   // Paint the temporary logged-in user box from mock data.
-  if (els.lobbyProfileImage) els.lobbyProfileImage.src = mockCurrentUser.profileImage;
+  setProfileImage(els.lobbyProfileImage, mockCurrentUser.profileImage);
   if (els.lobbyNickname) els.lobbyNickname.textContent = mockCurrentUser.nickname;
   if (els.lobbyRankingPoint) els.lobbyRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
-  if (els.rankingProfileImage) els.rankingProfileImage.src = mockCurrentUser.profileImage;
+  setProfileImage(els.rankingProfileImage, mockCurrentUser.profileImage);
   if (els.rankingNickname) els.rankingNickname.textContent = mockCurrentUser.nickname;
   if (els.rankingRankingPoint) els.rankingRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
-  if (els.friendsProfileImage) els.friendsProfileImage.src = mockCurrentUser.profileImage;
+  setProfileImage(els.friendsProfileImage, mockCurrentUser.profileImage);
   if (els.friendsNickname) els.friendsNickname.textContent = mockCurrentUser.nickname;
   if (els.friendsRankingPoint) els.friendsRankingPoint.textContent = `${mockCurrentUser.rankingPoint} RP`;
   if (els.nicknameInput) els.nicknameInput.value = mockCurrentUser.nickname;
@@ -864,11 +799,7 @@ function renderRoomList() {
     button; private rooms ask for their room code before emitting join_room.
   */
   const rooms = roomClient.rooms || [];
-  if (!rooms.length) {
-    els.roomList.innerHTML = `<div class="room-empty">No waiting rooms yet.</div>`;
-    return;
-  }
-
+  els.roomList.classList.toggle("is-empty", !rooms.length);
   els.roomList.innerHTML = `
     <div class="room-list-header" aria-hidden="true">
       <span>No.</span>
@@ -877,7 +808,7 @@ function renderRoomList() {
       <span>Players</span>
       <span></span>
     </div>
-    ${rooms.map((room, index) => {
+    ${!rooms.length ? `<div class="room-empty">대기 중인 방이 없습니다.</div>` : rooms.map((room, index) => {
       const isFull = room.playerCount >= room.maxPlayers;
       return `
         <div class="room-row">
@@ -885,7 +816,7 @@ function renderRoomList() {
           <span class="room-name">${escapeHtml(room.roomName)}${room.isPrivate ? `<span class="room-private-mark">(P)</span>` : ""}</span>
           <span>${roomLevelLabel(room.level)}</span>
           <span>${room.playerCount}/${room.maxPlayers}</span>
-          <button class="room-join-button" type="button" data-join-room="${escapeHtml(room.roomCode)}" data-private="${room.isPrivate ? "true" : "false"}" ${isFull ? "disabled" : ""}>Join</button>
+          <button class="room-join-button" type="button" data-join-room="${escapeHtml(room.roomCode)}" data-private="${room.isPrivate ? "true" : "false"}" ${isFull ? "disabled" : ""}>참여</button>
         </div>
       `;
     }).join("")}
@@ -903,11 +834,21 @@ function renderRoomList() {
   });
 }
 
-function renderRankingTable() {
-  // Paint the real leaderboard table in highest-ranking-point order.
-  if (!els.rankingTableBody) return;
+function updateRankingTabs() {
+  if (!els.allRankingTabButton || !els.friendRankingTabButton) return;
+  els.allRankingTabButton.classList.toggle("is-active", rankingMode === "all");
+  els.friendRankingTabButton.classList.toggle("is-active", rankingMode === "friends");
+  els.allRankingTabButton.setAttribute("aria-pressed", String(rankingMode === "all"));
+  els.friendRankingTabButton.setAttribute("aria-pressed", String(rankingMode === "friends"));
+}
 
-  if (leaderboardLoading) {
+function renderRankingTable() {
+  // Paint the ranking table in highest-ranking-point order.
+  if (!els.rankingTableBody) return;
+  updateRankingTabs();
+
+  const friendRankingLoading = rankingMode === "friends" && friendsLoading;
+  if (leaderboardLoading || friendRankingLoading) {
     els.rankingTableBody.innerHTML = `
       <tr>
         <td colspan="4">Loading rankings...</td>
@@ -916,7 +857,25 @@ function renderRankingTable() {
     return;
   }
 
-  if (!leaderboardUsers.length) {
+  const currentUserRankingEntry = {
+    id: mockCurrentUser.id,
+    nickname: mockCurrentUser.nickname,
+    profileImage: mockCurrentUser.profileImage,
+    rankingPoint: Number(mockCurrentUser.rankingPoint) || 0
+  };
+  const rankingUsers = rankingMode === "friends"
+    ? [
+      currentUserRankingEntry,
+      ...friends.map((friend) => ({
+        id: friend.id,
+        nickname: friend.nickname,
+        profileImage: friend.profileImage,
+        rankingPoint: Number(friend.rankingPoint) || 0
+      }))
+    ]
+    : leaderboardUsers;
+
+  if (!rankingUsers.length) {
     els.rankingTableBody.innerHTML = `
       <tr>
         <td colspan="4">No ranking data yet.</td>
@@ -925,17 +884,30 @@ function renderRankingTable() {
     return;
   }
 
-  els.rankingTableBody.innerHTML = leaderboardUsers
+  els.rankingTableBody.innerHTML = rankingUsers
     .slice()
     .sort((a, b) => b.rankingPoint - a.rankingPoint)
     .map((user, index) => `
-      <tr class="${user.id === game.localPlayerId ? "is-me" : ""}">
+      <tr class="${user.id === mockCurrentUser.id ? "is-me" : ""}">
         <td>${index + 1}</td>
         <td><img class="ranking-profile-image" src="${normalizeProfileImage(user.profileImage)}" alt="" /></td>
         <td>${escapeHtml(user.nickname)}</td>
         <td>${Number(user.rankingPoint) || 0} RP</td>
       </tr>
     `).join("");
+}
+
+async function setRankingMode(mode) {
+  rankingMode = mode === "friends" ? "friends" : "all";
+  updateRankingTabs();
+
+  if (rankingMode === "friends") {
+    await loadFriendsFromDb();
+  } else {
+    await loadLeaderboardFromDb();
+  }
+
+  renderRankingTable();
 }
 
 async function loadLeaderboardFromDb(force = false) {
@@ -976,8 +948,9 @@ async function loadFriendsFromDb(force = false) {
   if (friendsLoadPromise) return friendsLoadPromise;
   if (friendsLoaded && !force) return friends;
 
+  const showLoadingRow = !friendsLoaded && !friends.length;
   friendsLoading = true;
-  renderFriendsTable();
+  if (showLoadingRow) renderFriendsTable();
   if (els.friendsStatus) els.friendsStatus.textContent = "Loading friends...";
 
   friendsLoadPromise = import(LOGIN_MODULE_URL)
@@ -1015,7 +988,7 @@ function renderFriendsTable() {
     The array order is kept as loaded; later DB work can add explicit ordering.
   */
   if (!els.friendsTableBody) return;
-  if (friendsLoading) {
+  if (friendsLoading && !friendsLoaded && !friends.length) {
     els.friendsTableBody.innerHTML = `
       <tr>
         <td class="friends-empty" colspan="5">Loading friends...</td>
@@ -1027,7 +1000,7 @@ function renderFriendsTable() {
   if (!friends.length) {
     els.friendsTableBody.innerHTML = `
       <tr>
-        <td class="friends-empty" colspan="5">No friends yet.</td>
+        <td class="friends-empty" colspan="5">친구가 없습니다.</td>
       </tr>
     `;
     return;
@@ -1035,7 +1008,7 @@ function renderFriendsTable() {
 
   els.friendsTableBody.innerHTML = friends.map((friend, index) => {
     const statusClass = friend.online ? "is-online" : "is-offline";
-    const statusText = friend.online ? "Online" : "Offline";
+    const statusText = friend.online ? "온라인" : "오프라인";
     return `
       <tr>
         <td>${index + 1}</td>
@@ -1048,7 +1021,7 @@ function renderFriendsTable() {
               <span class="friend-status-dot ${statusClass}" aria-hidden="true"></span>
               ${statusText}
             </span>
-            <button class="friend-delete-button" type="button" data-delete-friend="${escapeHtml(friend.id)}" aria-label="Delete ${escapeHtml(friend.nickname)}" ${friendDeleteMode ? "" : "hidden disabled"}>Delete</button>
+            <button class="friend-delete-button" type="button" data-delete-friend="${escapeHtml(friend.id)}" aria-label="Delete ${escapeHtml(friend.nickname)}" ${friendDeleteMode ? "" : "hidden disabled"}>삭제</button>
           </div>
         </td>
       </tr>
@@ -1064,23 +1037,28 @@ function renderMailboxNotices() {
   // Paint the temporary mailbox notice list.
   if (!els.mailboxNoticeList) return;
   if (mailboxLoading) {
-    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">Loading notices...</div>`;
+    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">알림을 불러오는 중...</div>`;
     return;
   }
 
   if (!mockMailboxNotices.length) {
-    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">No notices.</div>`;
+    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">알림이 없습니다.</div>`;
     return;
   }
 
-  els.mailboxNoticeList.innerHTML = mockMailboxNotices.map((notice) => `
-    <div class="mailbox-notice-row">
-      <button class="mailbox-message-button" type="button" data-mailbox-open="${escapeHtml(notice.id)}">
-        ${escapeHtml(notice.message)}
-      </button>
-      <button class="mailbox-delete-button" type="button" data-mailbox-delete="${escapeHtml(notice.id)}">Delete</button>
-    </div>
-  `).join("");
+  els.mailboxNoticeList.innerHTML = mockMailboxNotices.map((notice) => {
+    const message = notice.type === "invite"
+      ? `"${notice.sender}"이 게임으로 초대했습니다.`
+      : `"${notice.sender}"이 친구 신청을 보냈습니다.`;
+    return `
+      <div class="mailbox-notice-row">
+        <button class="mailbox-message-button" type="button" data-mailbox-open="${escapeHtml(notice.id)}">
+          ${escapeHtml(message)}
+        </button>
+        <button class="mailbox-delete-button" type="button" data-mailbox-delete="${escapeHtml(notice.id)}">삭제</button>
+      </div>
+    `;
+  }).join("");
 
   document.querySelectorAll("[data-mailbox-open]").forEach((button) => {
     button.addEventListener("click", () => openMailboxDetail(button.dataset.mailboxOpen));
@@ -1177,7 +1155,7 @@ function updateFriendDeleteModeButton() {
   if (!els.deleteFriendModeButton) return;
   els.deleteFriendModeButton.classList.toggle("is-active", friendDeleteMode);
   els.deleteFriendModeButton.setAttribute("aria-pressed", String(friendDeleteMode));
-  els.deleteFriendModeButton.textContent = friendDeleteMode ? "Cancel Delete" : "Delete Friend";
+  els.deleteFriendModeButton.textContent = friendDeleteMode ? "삭제 취소" : "친구 삭제";
 }
 
 function toggleFriendDeleteMode() {
@@ -1267,15 +1245,15 @@ function renderLobby() {
     map(...) creates one HTML string per player; join("") combines them into one string.
   */
   const playerSlots = game.players.map((player) => `
-      <div class="lobby-player-item">
+      <div class="waiting-player-item">
         <span>${escapeHtml(player.name)}</span>
-        <span class="lobby-player-badge">${player.isHost ? "Host" : "Player"}</span>
+        <span class="waiting-player-badge">${player.isHost ? "Host" : "Player"}</span>
       </div>
     `).join("");
   const emptySlotCount = Math.max(0, roomClient.maxPlayers - game.players.length);
   const emptySlots = Array.from({ length: emptySlotCount }, (_, index) => `
-      <div class="lobby-player-item is-empty-slot">
-        <button class="invite-slot-button" type="button" data-open-invite-friends="${index + 1}">Invite Friend</button>
+      <div class="waiting-player-item is-empty-slot">
+        <button class="waiting-invite-slot-button" type="button" data-open-invite-friends="${index + 1}">Invite Friend</button>
       </div>
     `).join("");
 
@@ -1801,25 +1779,25 @@ async function sendFriendRequest() {
   const nickname = els.addFriendNicknameInput.value.trim();
   if (!nickname) {
     els.addFriendNicknameInput.focus();
-    if (els.friendsStatus) els.friendsStatus.textContent = "Enter a user nickname first.";
+    if (els.friendsStatus) els.friendsStatus.textContent = "유저 닉네임을 먼저 입력해 주세요.";
     return;
   }
 
-  const previousButtonText = els.sendFriendRequestButton?.textContent || "Send Request";
+  const previousButtonText = els.sendFriendRequestButton?.textContent || "요청 보내기";
   if (els.sendFriendRequestButton) {
     els.sendFriendRequestButton.disabled = true;
-    els.sendFriendRequestButton.textContent = "Saving...";
+    els.sendFriendRequestButton.textContent = "요청 중...";
   }
-  if (els.friendsStatus) els.friendsStatus.textContent = `Sending friend request to ${nickname}...`;
+  if (els.friendsStatus) els.friendsStatus.textContent = `${nickname}님에게 친구 요청을 보내는 중...`;
 
   try {
     const { sendFriendRequestByNickname } = await import(LOGIN_MODULE_URL);
     const friend = await sendFriendRequestByNickname(mockCurrentUser.id, nickname);
     closeAddFriendModal();
-    if (els.friendsStatus) els.friendsStatus.textContent = `Friend request sent to ${friend.nickname}.`;
+    if (els.friendsStatus) els.friendsStatus.textContent = `${friend.nickname}님에게 친구 요청을 보냈습니다.`;
   } catch (error) {
     console.error("Failed to add friend:", error);
-    if (els.friendsStatus) els.friendsStatus.textContent = error.message || "Could not add friend.";
+    if (els.friendsStatus) els.friendsStatus.textContent = error.message || "친구 요청을 보내지 못했습니다.";
   } finally {
     if (els.sendFriendRequestButton) {
       els.sendFriendRequestButton.disabled = false;
@@ -1931,7 +1909,7 @@ function runPendingRoomAction() {
   return false;
 }
 
-function resetToMainLobby(message = "Choose or create a room.") {
+function resetToMainLobby(message = "") {
   clearAllTimers();
   if (PAGE_KIND === "game") {
     goToLobby(message);
@@ -1972,6 +1950,7 @@ function resetToMainLobby(message = "Choose or create a room.") {
 function showRankingPage() {
   // Navigate from the room lobby to the ranking page.
   roomClient.lobbyView = "ranking";
+  rankingMode = "all";
   game.phase = "lobby";
   render();
   loadLeaderboardFromDb(true);
@@ -1992,7 +1971,7 @@ function openMailboxModal() {
   closeProfileMenus();
   renderMailboxNotices();
   els.mailboxLayer.hidden = false;
-  if (els.mailboxStatus) els.mailboxStatus.textContent = "Click a message to read the full notice.";
+  if (els.mailboxStatus) els.mailboxStatus.textContent = "";
   loadMailboxNoticesFromDb(true);
 }
 
@@ -2000,6 +1979,75 @@ function closeMailboxModal() {
   // Hide the mailbox popup and any full-message popup opened from it.
   if (els.mailboxLayer) els.mailboxLayer.hidden = true;
   closeMailboxDetail();
+}
+
+const USER_INFO_INVALID_BORDER = "rgba(255, 90, 90, 0.5)";
+const USER_INFO_VALID_BORDER = "var(--line)";
+const USER_INFO_FIELDS = {
+  userInfoEmailInput: {
+    key: "email",
+    success: "사용 가능한 이메일입니다.",
+    invalid: "올바른 이메일 형식으로 입력해 주세요."
+  },
+  userInfoNicknameInput: {
+    key: "nickname",
+    success: "사용 가능한 닉네임입니다.",
+    invalid: "닉네임은 2~12자의 한글, 영어, 숫자만 사용할 수 있습니다."
+  },
+  userInfoIdInput: {
+    key: "loginId",
+    success: "사용 가능한 아이디입니다.",
+    invalid: "아이디는 영어와 숫자만 사용할 수 있습니다."
+  },
+  userInfoPasswordInput: {
+    key: "password",
+    success: "사용 가능한 비밀번호입니다.",
+    invalid: "비밀번호는 8~12자이며 영어, 숫자, 특수문자를 모두 포함해야 합니다."
+  }
+};
+
+function userInfoEditButtons() {
+  return Array.from(document.querySelectorAll("[data-user-info-edit]"));
+}
+
+function userInfoStatusElement(inputId) {
+  return document.querySelector(`[data-user-info-status="${inputId}"]`);
+}
+
+function setUserInfoInputBorder(input, color) {
+  if (!input) return;
+  input.style.setProperty("border-color", color, "important");
+  input.style.setProperty("outline", "none", "important");
+}
+
+function setUserInfoStatus(inputId, message = "", type = "") {
+  const status = userInfoStatusElement(inputId);
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("is-error", type === "error");
+  status.classList.toggle("is-success", type === "success");
+}
+
+function currentUserInfoValue(inputId) {
+  const meta = USER_INFO_FIELDS[inputId];
+  if (!meta) return "";
+  return String(mockCurrentUser[meta.key] || "");
+}
+
+function isUserInfoRowEditing() {
+  return userInfoEditButtons().some((button) => button.classList.contains("is-confirming"));
+}
+
+function updateUserInfoSaveButtonState() {
+  if (!els.saveUserInfoButton) return;
+  els.saveUserInfoButton.disabled = isUserInfoRowEditing();
+}
+
+function resetUserInfoEditButtons() {
+  userInfoEditButtons().forEach((button) => {
+    button.textContent = "수정";
+    button.classList.remove("is-confirming");
+  });
 }
 
 function setUserInfoInputsDisabled(disabled) {
@@ -2014,16 +2062,32 @@ function setUserInfoInputsDisabled(disabled) {
   });
 }
 
+function resetUserInfoValidation() {
+  Object.keys(USER_INFO_FIELDS).forEach((inputId) => {
+    const input = document.getElementById(inputId);
+    if (input) {
+      setUserInfoInputBorder(input, USER_INFO_VALID_BORDER);
+      delete input.dataset.userInfoConfirmed;
+    }
+    setUserInfoStatus(inputId);
+  });
+}
+
 function renderUserInfoPopup() {
   // Fill the user-info popup from the current mock user.
   if (!els.userInfoLayer) return;
-  if (els.userInfoMainImage) els.userInfoMainImage.src = mockCurrentUser.profileImage;
+  setProfileImage(els.userInfoMainImage, mockCurrentUser.profileImage);
   if (els.userInfoIdInput) els.userInfoIdInput.value = mockCurrentUser.loginId;
   if (els.userInfoNicknameInput) els.userInfoNicknameInput.value = mockCurrentUser.nickname;
   if (els.userInfoPasswordInput) els.userInfoPasswordInput.value = mockCurrentUser.password;
   if (els.userInfoEmailInput) els.userInfoEmailInput.value = mockCurrentUser.email;
-  if (els.saveUserInfoButton) els.saveUserInfoButton.textContent = "Save";
+  if (els.saveUserInfoButton) {
+    els.saveUserInfoButton.textContent = "저장";
+    els.saveUserInfoButton.disabled = false;
+  }
   setUserInfoInputsDisabled(true);
+  resetUserInfoEditButtons();
+  resetUserInfoValidation();
 }
 
 function openUserInfoModal() {
@@ -2039,13 +2103,134 @@ function closeUserInfoModal() {
   if (els.userInfoLayer) els.userInfoLayer.hidden = true;
 }
 
-function enableUserInfoInput(inputId) {
+function sanitizeUserInfoInput(input) {
+  if (!input) return "";
+  if (input.id === "userInfoIdInput") {
+    input.value = input.value.replace(/[^a-zA-Z0-9]/g, "");
+  }
+  if (input.id === "userInfoNicknameInput") {
+    input.value = input.value.normalize("NFC").replace(/[^a-zA-Z0-9가-힣]/g, "");
+  }
+  if (input.id === "userInfoEmailInput") {
+    input.value = input.value.trim();
+  }
+  return input.value;
+}
+
+function checkUserInfoFormat(input) {
+  const value = sanitizeUserInfoInput(input);
+
+  if (input.id === "userInfoEmailInput") {
+    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value);
+  }
+
+  if (input.id === "userInfoNicknameInput") {
+    return /^[a-zA-Z0-9가-힣]{2,12}$/.test(value);
+  }
+
+  if (input.id === "userInfoIdInput") {
+    return /^[a-zA-Z0-9]+$/.test(value);
+  }
+
+  if (input.id === "userInfoPasswordInput") {
+    const hasLetter = /[a-zA-Z]/.test(value);
+    const hasNumber = /\d/.test(value);
+    const hasSpecial = /[!@#$%^&*()_+~\-={}\[\]:;"'<>,.?/|\\]/.test(value);
+    return value.length >= 8 && value.length <= 12 && hasLetter && hasNumber && hasSpecial;
+  }
+
+  return true;
+}
+
+async function validateUserInfoInput(input, checkDuplicate = false) {
+  const meta = USER_INFO_FIELDS[input.id];
+  if (!meta) return { valid: true, message: "" };
+
+  if (!checkUserInfoFormat(input)) {
+    return { valid: false, message: meta.invalid };
+  }
+
+  const nextValue = input.value.trim();
+  const previousValue = currentUserInfoValue(input.id);
+  const valueChanged = nextValue !== previousValue;
+
+  if (checkDuplicate && valueChanged && input.id === "userInfoIdInput") {
+    const { checkIdDuplicate } = await import(LOGIN_MODULE_URL);
+    if (await checkIdDuplicate(nextValue)) {
+      return { valid: false, message: "이미 사용 중인 아이디입니다." };
+    }
+  }
+
+  if (checkDuplicate && valueChanged && input.id === "userInfoNicknameInput") {
+    const { checkNicknameDuplicate } = await import(LOGIN_MODULE_URL);
+    if (await checkNicknameDuplicate(nextValue)) {
+      return { valid: false, message: "이미 사용 중인 닉네임입니다." };
+    }
+  }
+
+  return { valid: true, message: meta.success };
+}
+
+function markUserInfoInputPending(input) {
+  if (!input) return;
+  delete input.dataset.userInfoConfirmed;
+  const validFormat = !input.value || checkUserInfoFormat(input);
+  setUserInfoInputBorder(input, validFormat ? USER_INFO_VALID_BORDER : USER_INFO_INVALID_BORDER);
+  setUserInfoStatus(input.id);
+}
+
+function enableUserInfoInput(inputId, button) {
   // Edit buttons enable one row at a time and focus its input.
   const input = document.getElementById(inputId);
   if (!input) return;
   input.disabled = false;
+  delete input.dataset.userInfoConfirmed;
+  if (button) {
+    button.textContent = "확인";
+    button.classList.add("is-confirming");
+  }
+  setUserInfoStatus(inputId);
+  setUserInfoInputBorder(input, USER_INFO_VALID_BORDER);
+  updateUserInfoSaveButtonState();
   input.focus();
   input.select();
+}
+
+async function confirmUserInfoInput(inputId, button) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  button.disabled = true;
+  const result = await validateUserInfoInput(input, true).catch((error) => {
+    console.error("User info validation failed:", error);
+    return { valid: false, message: "확인 중 오류가 발생했습니다." };
+  });
+  button.disabled = false;
+
+  if (!result.valid) {
+    setUserInfoInputBorder(input, USER_INFO_INVALID_BORDER);
+    setUserInfoStatus(inputId, result.message, "error");
+    input.disabled = false;
+    input.focus();
+    updateUserInfoSaveButtonState();
+    return;
+  }
+
+  setUserInfoInputBorder(input, USER_INFO_VALID_BORDER);
+  setUserInfoStatus(inputId, result.message, "success");
+  input.disabled = true;
+  input.dataset.userInfoConfirmed = input.value.trim() !== currentUserInfoValue(inputId) ? "true" : "false";
+  button.textContent = "수정";
+  button.classList.remove("is-confirming");
+  updateUserInfoSaveButtonState();
+}
+
+function toggleUserInfoEdit(inputId, button) {
+  if (button.classList.contains("is-confirming")) {
+    confirmUserInfoInput(inputId, button);
+  } else {
+    enableUserInfoInput(inputId, button);
+  }
 }
 
 function editProfileImage() {
@@ -2097,10 +2282,10 @@ async function uploadSelectedProfileImage(event) {
     return;
   }
 
-  const previousButtonText = els.editProfileImageButton?.textContent || "Edit Profile Image";
+  const previousButtonText = els.editProfileImageButton?.textContent || "프로필 사진 수정";
   if (els.editProfileImageButton) {
     els.editProfileImageButton.disabled = true;
-    els.editProfileImageButton.textContent = "Uploading...";
+    els.editProfileImageButton.textContent = "업로드 중...";
   }
 
   try {
@@ -2113,7 +2298,7 @@ async function uploadSelectedProfileImage(event) {
     renderUserInfoPopup();
 
     if (els.editProfileImageButton) {
-      els.editProfileImageButton.textContent = "Uploaded";
+      els.editProfileImageButton.textContent = "업로드 완료";
       setTimeout(() => {
         if (els.editProfileImageButton) els.editProfileImageButton.textContent = previousButtonText;
       }, 1200);
@@ -2128,22 +2313,61 @@ async function uploadSelectedProfileImage(event) {
   }
 }
 
-function saveUserInfoChanges() {
+async function saveUserInfoChanges() {
   /*
-    Save edited mock fields locally.
-    Later this can become a backend request to the real user database.
+    Save confirmed user-info edits locally and to Firestore.
+    The save button is disabled while any row is still waiting for confirmation.
   */
-  const nextNickname = els.userInfoNicknameInput.value.trim() || mockCurrentUser.nickname;
-  mockCurrentUser.loginId = els.userInfoIdInput.value.trim() || mockCurrentUser.loginId;
-  mockCurrentUser.nickname = nextNickname;
-  mockCurrentUser.password = els.userInfoPasswordInput.value || mockCurrentUser.password;
-  mockCurrentUser.email = els.userInfoEmailInput.value.trim() || mockCurrentUser.email;
+  if (isUserInfoRowEditing()) {
+    updateUserInfoSaveButtonState();
+    return;
+  }
 
-  saveMockUser();
-  renderLobbyUser();
-  renderUserInfoPopup();
-  setUserInfoInputsDisabled(true);
-  if (els.saveUserInfoButton) els.saveUserInfoButton.textContent = "Saved";
+  const pendingUpdates = {};
+  const nextValues = {};
+
+  Object.entries(USER_INFO_FIELDS).forEach(([inputId, meta]) => {
+    const input = document.getElementById(inputId);
+    if (!input || input.dataset.userInfoConfirmed !== "true") return;
+    const nextValue = inputId === "userInfoPasswordInput" ? input.value : input.value.trim();
+    pendingUpdates[meta.key] = nextValue;
+    nextValues[meta.key] = nextValue;
+  });
+
+  if (els.saveUserInfoButton) {
+    els.saveUserInfoButton.disabled = true;
+    els.saveUserInfoButton.textContent = "저장 중...";
+  }
+
+  try {
+    if (Object.keys(pendingUpdates).length) {
+      const { updateUserInfo } = await import(LOGIN_MODULE_URL);
+      await updateUserInfo(mockCurrentUser.id, {
+        user_id: pendingUpdates.loginId,
+        nickname: pendingUpdates.nickname,
+        password: pendingUpdates.password,
+        email: pendingUpdates.email
+      });
+    }
+
+    Object.assign(mockCurrentUser, nextValues);
+
+    saveMockUser();
+    renderLobbyUser();
+    renderUserInfoPopup();
+    setUserInfoInputsDisabled(true);
+    if (els.saveUserInfoButton) {
+      els.saveUserInfoButton.textContent = "저장 완료";
+      els.saveUserInfoButton.disabled = false;
+    }
+  } catch (error) {
+    console.error("Failed to save user info:", error);
+    if (els.saveUserInfoButton) {
+      els.saveUserInfoButton.textContent = "저장";
+      els.saveUserInfoButton.disabled = false;
+    }
+    alert("유저 정보를 저장하지 못했습니다. 다시 시도해 주세요.");
+  }
 }
 
 function openMailboxDetail(noticeId) {
@@ -2151,7 +2375,8 @@ function openMailboxDetail(noticeId) {
   const notice = mockMailboxNotices.find((item) => item.id === noticeId);
   if (!notice || !els.mailboxDetailLayer || !els.mailboxDetailContent) return;
 
-  els.mailboxDetailTitle.textContent = notice.type === "friend" ? "Friend Request" : "Game Invite";
+  markMailboxNoticeAsRead(notice.id);
+  els.mailboxDetailTitle.textContent = notice.type === "friend" ? "친구 신청" : "게임 방 초대";
   const roomHtml = notice.type === "invite" && notice.room
     ? `
       <div class="mailbox-detail-room" aria-label="Room information">
@@ -2181,8 +2406,8 @@ function openMailboxDetail(noticeId) {
     </div>
     ${roomHtml}
     <div class="mailbox-detail-actions">
-      <button class="mailbox-detail-action is-accept" type="button" data-mailbox-response="accept" data-mailbox-response-id="${escapeHtml(notice.id)}">Accept</button>
-      <button class="mailbox-detail-action is-reject" type="button" data-mailbox-response="reject" data-mailbox-response-id="${escapeHtml(notice.id)}">Reject</button>
+      <button class="mailbox-detail-action is-accept" type="button" data-mailbox-response="accept" data-mailbox-response-id="${escapeHtml(notice.id)}">수락</button>
+      <button class="mailbox-detail-action is-reject" type="button" data-mailbox-response="reject" data-mailbox-response-id="${escapeHtml(notice.id)}">거절</button>
     </div>
   `;
 
@@ -2272,7 +2497,7 @@ async function deleteMailboxNotice(noticeId) {
   if (els.mailboxStatus) els.mailboxStatus.textContent = "Notice deleted.";
 }
 
-function showMainLobbyPage(message = "Choose or create a room.") {
+function showMainLobbyPage(message = "") {
   // Navigate back to the main room list from a lobby subpage.
   if (PAGE_KIND === "game") {
     goToLobby(message);
@@ -2297,6 +2522,7 @@ function closeProfileMenus(exceptMenu = null) {
     [els.friendsProfileBox, els.friendsProfileMenu]
   ].forEach(([box, menu]) => {
     if (!box || !menu || menu === exceptMenu) return;
+    menu.classList.remove("is-open");
     menu.hidden = true;
     box.setAttribute("aria-expanded", "false");
   });
@@ -2305,9 +2531,11 @@ function closeProfileMenus(exceptMenu = null) {
 function toggleProfileMenu(box, menu) {
   // Open the clicked profile menu, or close it if it is already open.
   if (!box || !menu) return;
-  const shouldOpen = menu.hidden;
+  const shouldOpen = menu.hidden || !menu.classList.contains("is-open");
   closeProfileMenus(shouldOpen ? menu : null);
-  menu.hidden = !shouldOpen;
+  menu.hidden = false;
+  menu.classList.toggle("is-open", shouldOpen);
+  if (!shouldOpen) menu.hidden = true;
   box.setAttribute("aria-expanded", String(shouldOpen));
 }
 
@@ -2640,6 +2868,14 @@ if (els.deleteFriendModeButton) {
   els.deleteFriendModeButton.addEventListener("click", toggleFriendDeleteMode);
 }
 
+if (els.allRankingTabButton) {
+  els.allRankingTabButton.addEventListener("click", () => setRankingMode("all"));
+}
+
+if (els.friendRankingTabButton) {
+  els.friendRankingTabButton.addEventListener("click", () => setRankingMode("friends"));
+}
+
 [
   [els.lobbyProfileBox, els.lobbyProfileMenu],
   [els.rankingProfileBox, els.rankingProfileMenu],
@@ -2759,7 +2995,13 @@ if (els.userInfoLayer) {
 }
 
 document.querySelectorAll("[data-user-info-edit]").forEach((button) => {
-  button.addEventListener("click", () => enableUserInfoInput(button.dataset.userInfoEdit));
+  button.addEventListener("click", () => toggleUserInfoEdit(button.dataset.userInfoEdit, button));
+});
+
+Object.keys(USER_INFO_FIELDS).forEach((inputId) => {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener("input", () => markUserInfoInputPending(input));
 });
 
 if (els.editProfileImageButton) {
@@ -2861,7 +3103,7 @@ els.submitFinalButton.addEventListener("click", () => {
 
 els.closeResult.addEventListener("click", () => {
   // After results are read, return this browser to the main lobby.
-  resetToMainLobby("Choose or create a room.");
+  resetToMainLobby();
 });
 
 els.exitButton.addEventListener("click", () => {
@@ -2895,7 +3137,7 @@ if (PREVIEW_GAME_SCREEN) {
   socket.on("connect", () => {
     if (PAGE_KIND === "game") {
       if (!runPendingRoomAction()) {
-        goToLobby("Choose or create a room.");
+        goToLobby();
       }
       return;
     }
@@ -2920,7 +3162,7 @@ if (PREVIEW_GAME_SCREEN) {
 
   // Game-specific events sent by server.js.
   socket.on("room_list", handleRoomList);
-  socket.on("left_room", () => resetToMainLobby("Choose or create a room."));
+  socket.on("left_room", () => resetToMainLobby());
   socket.on("room_update", handleRoomUpdate);
   socket.on("round_start", handleRoundStart);
   socket.on("turn_start", handleTurnStart);
