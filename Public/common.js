@@ -1,4 +1,4 @@
-﻿/*
+/*
   Color Master frontend controller.
 
   Think of this file as the "brain" of the browser page:
@@ -71,9 +71,15 @@ const PREVIEW_GAME_SCREEN = false;
 */
 const socket = typeof window.io === "function" ? window.io() : null;
 
-const LOGIN_PAGE_URL = window.location.protocol === "file:" ? "../index.html" : "/login";
-const LOGIN_MODULE_URL = window.location.protocol === "file:" ? "../login.js" : "/login.js";
+const PAGE_KIND = document.body?.dataset.page || "combined";
+const IS_LOBBY_PAGE = PAGE_KIND === "lobby";
+const IS_GAME_PAGE = PAGE_KIND === "game" || PAGE_KIND === "combined";
+const LOGIN_PAGE_URL = window.location.protocol === "file:" ? "auth.html" : "/auth.html";
+const LOBBY_PAGE_URL = window.location.protocol === "file:" ? "lobby.html" : "/lobby.html";
+const GAME_PAGE_URL = window.location.protocol === "file:" ? "game.html" : "/game.html";
+const LOGIN_MODULE_URL = window.location.protocol === "file:" ? "login.js" : "/login.js";
 const DEFAULT_PROFILE_IMAGE = "/Images/profile.png";
+const PENDING_ROOM_ACTION_KEY = "colorMasterPendingRoomAction";
 
 function normalizeProfileImage(profileImage) {
   /*
@@ -238,6 +244,40 @@ function saveMockUser() {
   sessionStorage.setItem("colorMasterCurrentUser", JSON.stringify(currentUser));
   sessionStorage.setItem("colorMasterUserId", mockCurrentUser.id);
   sessionStorage.setItem("loggedInNickname", mockCurrentUser.nickname);
+}
+
+function savePendingRoomAction(action) {
+  sessionStorage.setItem(PENDING_ROOM_ACTION_KEY, JSON.stringify(action));
+}
+
+function takePendingRoomAction() {
+  try {
+    const storedAction = sessionStorage.getItem(PENDING_ROOM_ACTION_KEY);
+    if (!storedAction) return null;
+    sessionStorage.removeItem(PENDING_ROOM_ACTION_KEY);
+    return JSON.parse(storedAction);
+  } catch (_error) {
+    sessionStorage.removeItem(PENDING_ROOM_ACTION_KEY);
+    return null;
+  }
+}
+
+function goToGameWithAction(action) {
+  savePendingRoomAction(action);
+  window.location.href = GAME_PAGE_URL;
+}
+
+function goToLobby(message = "") {
+  if (message) sessionStorage.setItem("colorMasterLobbyStatus", message);
+  window.location.href = LOBBY_PAGE_URL;
+}
+
+function restoreLobbyStatus() {
+  if (PAGE_KIND !== "lobby") return;
+  const message = sessionStorage.getItem("colorMasterLobbyStatus");
+  if (!message) return;
+  sessionStorage.removeItem("colorMasterLobbyStatus");
+  setLobbyStatus(message);
 }
 
 let leaderboardUsers = [];
@@ -539,141 +579,160 @@ let turnTimer = null;
 let choiceTimer = null;
 let presenceTimer = null;
 
+function createHiddenStubElement(id) {
+  /*
+    lobby.html and game.html now contain different parts of the old combined DOM.
+    The shared controller still references all ids, so missing page-specific
+    elements get inert hidden stubs instead of causing null errors.
+  */
+  const element = document.createElement("div");
+  element.id = id;
+  element.hidden = true;
+  element.style.display = "none";
+  element.setAttribute("data-stub-element", "true");
+  document.body.appendChild(element);
+  return element;
+}
+
+function byId(id) {
+  return document.getElementById(id) || createHiddenStubElement(id);
+}
+
 /*
   Frequently used DOM nodes.
-  document.getElementById("...") finds an element from the HTML by id.
+  byId("...") finds an element from the HTML by id.
   Storing them in els avoids repeating long DOM lookup code everywhere.
   If an id changes in the HTML, the matching name here must be updated too.
 */
 const els = {
-  screenTitle: document.getElementById("screenTitle"),
-  lobbyScreen: document.getElementById("lobbyScreen"),
-  gameBoard: document.getElementById("gameBoard"),
-  lobbyStatus: document.getElementById("lobbyStatus"),
-  mainLobbyPanel: document.getElementById("mainLobbyPanel"),
-  rankingPagePanel: document.getElementById("rankingPagePanel"),
-  waitingLobbyPanel: document.getElementById("waitingLobbyPanel"),
-  lobbyProfileImage: document.getElementById("lobbyProfileImage"),
-  lobbyNickname: document.getElementById("lobbyNickname"),
-  lobbyRankingPoint: document.getElementById("lobbyRankingPoint"),
-  rankingProfileImage: document.getElementById("rankingProfileImage"),
-  rankingNickname: document.getElementById("rankingNickname"),
-  rankingRankingPoint: document.getElementById("rankingRankingPoint"),
-  rankingStatus: document.getElementById("rankingStatus"),
-  rankingTableBody: document.getElementById("rankingTableBody"),
-  friendsPagePanel: document.getElementById("friendsPagePanel"),
-  friendsProfileImage: document.getElementById("friendsProfileImage"),
-  friendsNickname: document.getElementById("friendsNickname"),
-  friendsRankingPoint: document.getElementById("friendsRankingPoint"),
-  friendsStatus: document.getElementById("friendsStatus"),
-  friendsTableBody: document.getElementById("friendsTableBody"),
-  mailboxLayer: document.getElementById("mailboxLayer"),
-  mailboxStatus: document.getElementById("mailboxStatus"),
-  mailboxNoticeList: document.getElementById("mailboxNoticeList"),
-  leaderBoardsButton: document.getElementById("leaderBoardsButton"),
-  friendsButton: document.getElementById("friendsButton"),
-  mailboxButton: document.getElementById("mailboxButton"),
-  homeButton: document.getElementById("homeButton"),
-  lobbyProfileBox: document.getElementById("lobbyProfileBox"),
-  lobbyProfileMenu: document.getElementById("lobbyProfileMenu"),
-  lobbyUserInfoButton: document.getElementById("lobbyUserInfoButton"),
-  lobbyProfileLogOutButton: document.getElementById("lobbyProfileLogOutButton"),
-  rankingLeaderBoardsButton: document.getElementById("rankingLeaderBoardsButton"),
-  rankingFriendsButton: document.getElementById("rankingFriendsButton"),
-  rankingMailboxButton: document.getElementById("rankingMailboxButton"),
-  rankingHomeButton: document.getElementById("rankingHomeButton"),
-  rankingProfileBox: document.getElementById("rankingProfileBox"),
-  rankingProfileMenu: document.getElementById("rankingProfileMenu"),
-  rankingUserInfoButton: document.getElementById("rankingUserInfoButton"),
-  rankingProfileLogOutButton: document.getElementById("rankingProfileLogOutButton"),
-  friendsLeaderBoardsButton: document.getElementById("friendsLeaderBoardsButton"),
-  friendsFriendsButton: document.getElementById("friendsFriendsButton"),
-  friendsMailboxButton: document.getElementById("friendsMailboxButton"),
-  friendsHomeButton: document.getElementById("friendsHomeButton"),
-  friendsProfileBox: document.getElementById("friendsProfileBox"),
-  friendsProfileMenu: document.getElementById("friendsProfileMenu"),
-  friendsUserInfoButton: document.getElementById("friendsUserInfoButton"),
-  friendsProfileLogOutButton: document.getElementById("friendsProfileLogOutButton"),
-  mailboxCloseButton: document.getElementById("mailboxCloseButton"),
-  addFriendButton: document.getElementById("addFriendButton"),
-  deleteFriendModeButton: document.getElementById("deleteFriendModeButton"),
-  addFriendLayer: document.getElementById("addFriendLayer"),
-  closeAddFriendButton: document.getElementById("closeAddFriendButton"),
-  addFriendNicknameInput: document.getElementById("addFriendNicknameInput"),
-  sendFriendRequestButton: document.getElementById("sendFriendRequestButton"),
-  mailboxDetailLayer: document.getElementById("mailboxDetailLayer"),
-  closeMailboxDetailButton: document.getElementById("closeMailboxDetailButton"),
-  mailboxDetailTitle: document.getElementById("mailboxDetailTitle"),
-  mailboxDetailContent: document.getElementById("mailboxDetailContent"),
-  userInfoLayer: document.getElementById("userInfoLayer"),
-  closeUserInfoButton: document.getElementById("closeUserInfoButton"),
-  userInfoMainImage: document.getElementById("userInfoMainImage"),
-  editProfileImageButton: document.getElementById("editProfileImageButton"),
-  profileImageFileInput: document.getElementById("profileImageFileInput"),
-  userInfoIdInput: document.getElementById("userInfoIdInput"),
-  userInfoNicknameInput: document.getElementById("userInfoNicknameInput"),
-  userInfoPasswordInput: document.getElementById("userInfoPasswordInput"),
-  userInfoEmailInput: document.getElementById("userInfoEmailInput"),
-  saveUserInfoButton: document.getElementById("saveUserInfoButton"),
-  inviteFriendLayer: document.getElementById("inviteFriendLayer"),
-  closeInviteFriendButton: document.getElementById("closeInviteFriendButton"),
-  inviteFriendStatus: document.getElementById("inviteFriendStatus"),
-  inviteFriendTableBody: document.getElementById("inviteFriendTableBody"),
-  lobbyVolumeButton: document.getElementById("lobbyVolumeButton"),
-  lobbyVolumeSliderWrap: document.getElementById("lobbyVolumeSliderWrap"),
-  lobbyVolumeSlider: document.getElementById("lobbyVolumeSlider"),
-  rankingVolumeButton: document.getElementById("rankingVolumeButton"),
-  rankingVolumeSliderWrap: document.getElementById("rankingVolumeSliderWrap"),
-  rankingVolumeSlider: document.getElementById("rankingVolumeSlider"),
-  friendsVolumeButton: document.getElementById("friendsVolumeButton"),
-  friendsVolumeSliderWrap: document.getElementById("friendsVolumeSliderWrap"),
-  friendsVolumeSlider: document.getElementById("friendsVolumeSlider"),
-  roomList: document.getElementById("roomList"),
-  openCreateRoomButton: document.getElementById("openCreateRoomButton"),
-  createRoomLayer: document.getElementById("createRoomLayer"),
-  closeCreateRoomButton: document.getElementById("closeCreateRoomButton"),
-  cancelCreateRoomButton: document.getElementById("cancelCreateRoomButton"),
-  createRoomButton: document.getElementById("createRoomButton"),
-  createRoomNameInput: document.getElementById("createRoomNameInput"),
-  createRoomCodeInput: document.getElementById("createRoomCodeInput"),
-  createLevelSelect: document.getElementById("createLevelSelect"),
-  maxPlayersSelect: document.getElementById("maxPlayersSelect"),
-  privateRoomCodeLayer: document.getElementById("privateRoomCodeLayer"),
-  closePrivateRoomCodeButton: document.getElementById("closePrivateRoomCodeButton"),
-  privateRoomCodeInput: document.getElementById("privateRoomCodeInput"),
-  submitPrivateRoomCodeButton: document.getElementById("submitPrivateRoomCodeButton"),
-  nicknameInput: document.getElementById("nicknameInput"),
-  waitingRoomTitle: document.getElementById("waitingRoomTitle"),
-  waitingRoomMeta: document.getElementById("waitingRoomMeta"),
-  leaveRoomButton: document.getElementById("leaveRoomButton"),
-  startGameButton: document.getElementById("startGameButton"),
-  lobbyPlayersList: document.getElementById("lobbyPlayersList"),
-  roundLabel: document.getElementById("roundLabel"),
-  timerNumber: document.getElementById("timerNumber"),
-  timerCaption: document.getElementById("timerCaption"),
-  playersList: document.getElementById("playersList"),
-  targetImage: document.getElementById("targetImage"),
-  finalTargetImage: document.getElementById("finalTargetImage"),
-  rgbControls: document.getElementById("rgbControls"),
-  statusLine: document.getElementById("statusLine"),
-  guideButton: document.getElementById("guideButton"),
-  guidePopover: document.getElementById("guidePopover"),
-  closeGuide: document.getElementById("closeGuide"),
-  choiceLayer: document.getElementById("choiceLayer"),
-  choiceButtons: document.getElementById("choiceButtons"),
-  choicePopupTime: document.getElementById("choicePopupTime"),
-  closeChoice: document.getElementById("closeChoice"),
-  finalLayer: document.getElementById("finalLayer"),
-  finalPopupTime: document.getElementById("finalPopupTime"),
-  finalStatus: document.getElementById("finalStatus"),
-  submitFinalButton: document.getElementById("submitFinalButton"),
-  resultLayer: document.getElementById("resultLayer"),
-  resultText: document.getElementById("resultText"),
-  closeResult: document.getElementById("closeResult"),
-  exitButton: document.getElementById("exitButton"),
-  volumeButton: document.getElementById("volumeButton"),
-  volumeSliderWrap: document.getElementById("volumeSliderWrap"),
-  volumeSlider: document.getElementById("volumeSlider")
+  screenTitle: byId("screenTitle"),
+  lobbyScreen: byId("lobbyScreen"),
+  gameBoard: byId("gameBoard"),
+  lobbyStatus: byId("lobbyStatus"),
+  mainLobbyPanel: byId("mainLobbyPanel"),
+  rankingPagePanel: byId("rankingPagePanel"),
+  waitingLobbyPanel: byId("waitingLobbyPanel"),
+  lobbyProfileImage: byId("lobbyProfileImage"),
+  lobbyNickname: byId("lobbyNickname"),
+  lobbyRankingPoint: byId("lobbyRankingPoint"),
+  rankingProfileImage: byId("rankingProfileImage"),
+  rankingNickname: byId("rankingNickname"),
+  rankingRankingPoint: byId("rankingRankingPoint"),
+  rankingStatus: byId("rankingStatus"),
+  rankingTableBody: byId("rankingTableBody"),
+  friendsPagePanel: byId("friendsPagePanel"),
+  friendsProfileImage: byId("friendsProfileImage"),
+  friendsNickname: byId("friendsNickname"),
+  friendsRankingPoint: byId("friendsRankingPoint"),
+  friendsStatus: byId("friendsStatus"),
+  friendsTableBody: byId("friendsTableBody"),
+  mailboxLayer: byId("mailboxLayer"),
+  mailboxStatus: byId("mailboxStatus"),
+  mailboxNoticeList: byId("mailboxNoticeList"),
+  leaderBoardsButton: byId("leaderBoardsButton"),
+  friendsButton: byId("friendsButton"),
+  mailboxButton: byId("mailboxButton"),
+  homeButton: byId("homeButton"),
+  lobbyProfileBox: byId("lobbyProfileBox"),
+  lobbyProfileMenu: byId("lobbyProfileMenu"),
+  lobbyUserInfoButton: byId("lobbyUserInfoButton"),
+  lobbyProfileLogOutButton: byId("lobbyProfileLogOutButton"),
+  rankingLeaderBoardsButton: byId("rankingLeaderBoardsButton"),
+  rankingFriendsButton: byId("rankingFriendsButton"),
+  rankingMailboxButton: byId("rankingMailboxButton"),
+  rankingHomeButton: byId("rankingHomeButton"),
+  rankingProfileBox: byId("rankingProfileBox"),
+  rankingProfileMenu: byId("rankingProfileMenu"),
+  rankingUserInfoButton: byId("rankingUserInfoButton"),
+  rankingProfileLogOutButton: byId("rankingProfileLogOutButton"),
+  friendsLeaderBoardsButton: byId("friendsLeaderBoardsButton"),
+  friendsFriendsButton: byId("friendsFriendsButton"),
+  friendsMailboxButton: byId("friendsMailboxButton"),
+  friendsHomeButton: byId("friendsHomeButton"),
+  friendsProfileBox: byId("friendsProfileBox"),
+  friendsProfileMenu: byId("friendsProfileMenu"),
+  friendsUserInfoButton: byId("friendsUserInfoButton"),
+  friendsProfileLogOutButton: byId("friendsProfileLogOutButton"),
+  mailboxCloseButton: byId("mailboxCloseButton"),
+  addFriendButton: byId("addFriendButton"),
+  deleteFriendModeButton: byId("deleteFriendModeButton"),
+  addFriendLayer: byId("addFriendLayer"),
+  closeAddFriendButton: byId("closeAddFriendButton"),
+  addFriendNicknameInput: byId("addFriendNicknameInput"),
+  sendFriendRequestButton: byId("sendFriendRequestButton"),
+  mailboxDetailLayer: byId("mailboxDetailLayer"),
+  closeMailboxDetailButton: byId("closeMailboxDetailButton"),
+  mailboxDetailTitle: byId("mailboxDetailTitle"),
+  mailboxDetailContent: byId("mailboxDetailContent"),
+  userInfoLayer: byId("userInfoLayer"),
+  closeUserInfoButton: byId("closeUserInfoButton"),
+  userInfoMainImage: byId("userInfoMainImage"),
+  editProfileImageButton: byId("editProfileImageButton"),
+  profileImageFileInput: byId("profileImageFileInput"),
+  userInfoIdInput: byId("userInfoIdInput"),
+  userInfoNicknameInput: byId("userInfoNicknameInput"),
+  userInfoPasswordInput: byId("userInfoPasswordInput"),
+  userInfoEmailInput: byId("userInfoEmailInput"),
+  saveUserInfoButton: byId("saveUserInfoButton"),
+  inviteFriendLayer: byId("inviteFriendLayer"),
+  closeInviteFriendButton: byId("closeInviteFriendButton"),
+  inviteFriendStatus: byId("inviteFriendStatus"),
+  inviteFriendTableBody: byId("inviteFriendTableBody"),
+  lobbyVolumeButton: byId("lobbyVolumeButton"),
+  lobbyVolumeSliderWrap: byId("lobbyVolumeSliderWrap"),
+  lobbyVolumeSlider: byId("lobbyVolumeSlider"),
+  rankingVolumeButton: byId("rankingVolumeButton"),
+  rankingVolumeSliderWrap: byId("rankingVolumeSliderWrap"),
+  rankingVolumeSlider: byId("rankingVolumeSlider"),
+  friendsVolumeButton: byId("friendsVolumeButton"),
+  friendsVolumeSliderWrap: byId("friendsVolumeSliderWrap"),
+  friendsVolumeSlider: byId("friendsVolumeSlider"),
+  roomList: byId("roomList"),
+  openCreateRoomButton: byId("openCreateRoomButton"),
+  createRoomLayer: byId("createRoomLayer"),
+  closeCreateRoomButton: byId("closeCreateRoomButton"),
+  cancelCreateRoomButton: byId("cancelCreateRoomButton"),
+  createRoomButton: byId("createRoomButton"),
+  createRoomNameInput: byId("createRoomNameInput"),
+  createRoomCodeInput: byId("createRoomCodeInput"),
+  createLevelSelect: byId("createLevelSelect"),
+  maxPlayersSelect: byId("maxPlayersSelect"),
+  privateRoomCodeLayer: byId("privateRoomCodeLayer"),
+  closePrivateRoomCodeButton: byId("closePrivateRoomCodeButton"),
+  privateRoomCodeInput: byId("privateRoomCodeInput"),
+  submitPrivateRoomCodeButton: byId("submitPrivateRoomCodeButton"),
+  nicknameInput: byId("nicknameInput"),
+  waitingRoomTitle: byId("waitingRoomTitle"),
+  waitingRoomMeta: byId("waitingRoomMeta"),
+  leaveRoomButton: byId("leaveRoomButton"),
+  startGameButton: byId("startGameButton"),
+  lobbyPlayersList: byId("lobbyPlayersList"),
+  roundLabel: byId("roundLabel"),
+  timerNumber: byId("timerNumber"),
+  timerCaption: byId("timerCaption"),
+  playersList: byId("playersList"),
+  targetImage: byId("targetImage"),
+  finalTargetImage: byId("finalTargetImage"),
+  rgbControls: byId("rgbControls"),
+  statusLine: byId("statusLine"),
+  guideButton: byId("guideButton"),
+  guidePopover: byId("guidePopover"),
+  closeGuide: byId("closeGuide"),
+  choiceLayer: byId("choiceLayer"),
+  choiceButtons: byId("choiceButtons"),
+  choicePopupTime: byId("choicePopupTime"),
+  closeChoice: byId("closeChoice"),
+  finalLayer: byId("finalLayer"),
+  finalPopupTime: byId("finalPopupTime"),
+  finalStatus: byId("finalStatus"),
+  submitFinalButton: byId("submitFinalButton"),
+  resultLayer: byId("resultLayer"),
+  resultText: byId("resultText"),
+  closeResult: byId("closeResult"),
+  exitButton: byId("exitButton"),
+  volumeButton: byId("volumeButton"),
+  volumeSliderWrap: byId("volumeSliderWrap"),
+  volumeSlider: byId("volumeSlider")
 };
 
 function clamp(value, min, max) {
@@ -1332,7 +1391,7 @@ function renderChannels() {
   `;
 
   // innerHTML = ... creates a new button every time -> code must attach the click behavior again
-  document.getElementById("submitButton").addEventListener("click", () => {
+  byId("submitButton").addEventListener("click", () => {
     submitTurn(false);
   });
 
@@ -1559,7 +1618,7 @@ function areTurnInputsValid() {
 
 function updateTurnSubmitButtonState() {
   // Enable/disable the dynamically created turn Submit button.
-  const submitButton = document.getElementById("submitButton");
+  const submitButton = byId("submitButton");
   if (!submitButton) return;
   submitButton.disabled = !areTurnInputsValid();
 }
@@ -1782,14 +1841,23 @@ function createRoomFromLobby() {
 
   roomClient.nickname = currentNickname();
   roomClient.privateCode = els.createRoomCodeInput.value.trim();
-  socket.emit("create_room", {
+  const action = {
+    type: "create",
     roomName: els.createRoomNameInput.value.trim(),
     roomCode: roomClient.privateCode,
     level: Number(els.createLevelSelect.value),
     maxPlayers: Number(els.maxPlayersSelect.value),
     userId: game.localPlayerId,
     nickname: roomClient.nickname
-  });
+  };
+
+  if (!IS_GAME_PAGE || IS_LOBBY_PAGE) {
+    setLobbyStatus("Opening room...");
+    goToGameWithAction(action);
+    return;
+  }
+
+  socket.emit("create_room", action);
   setLobbyStatus("Creating room...");
 }
 
@@ -1807,17 +1875,69 @@ function joinRoom(roomCode, privateCode = "") {
   roomClient.roomCode = String(roomCode || "").trim().toUpperCase();
   roomClient.privateCode = String(privateCode || "").trim();
   roomClient.nickname = currentNickname();
-  socket.emit("join_room", {
+  const action = {
+    type: "join",
     roomCode: roomClient.roomCode,
     privateCode,
     userId: game.localPlayerId,
     nickname: roomClient.nickname
-  });
+  };
+
+  if (!IS_GAME_PAGE || IS_LOBBY_PAGE) {
+    setLobbyStatus("Opening room...");
+    goToGameWithAction(action);
+    return;
+  }
+
+  socket.emit("join_room", action);
   setLobbyStatus("Joining room...");
+}
+
+function runPendingRoomAction() {
+  if (!IS_GAME_PAGE || !socket) return false;
+
+  const action = takePendingRoomAction();
+  if (!action) return false;
+
+  roomClient.nickname = action.nickname || currentNickname();
+
+  if (action.type === "create") {
+    roomClient.privateCode = String(action.roomCode || "").trim();
+    socket.emit("create_room", {
+      roomName: action.roomName,
+      roomCode: roomClient.privateCode,
+      level: Number(action.level) || 1,
+      maxPlayers: Number(action.maxPlayers) || 5,
+      userId: game.localPlayerId,
+      nickname: roomClient.nickname
+    });
+    setLobbyStatus("Creating room...");
+    return true;
+  }
+
+  if (action.type === "join") {
+    roomClient.roomCode = String(action.roomCode || "").trim().toUpperCase();
+    roomClient.privateCode = String(action.privateCode || "").trim();
+    socket.emit("join_room", {
+      roomCode: roomClient.roomCode,
+      privateCode: roomClient.privateCode,
+      userId: game.localPlayerId,
+      nickname: roomClient.nickname
+    });
+    setLobbyStatus("Joining room...");
+    return true;
+  }
+
+  return false;
 }
 
 function resetToMainLobby(message = "Choose or create a room.") {
   clearAllTimers();
+  if (PAGE_KIND === "game") {
+    goToLobby(message);
+    return;
+  }
+
   roomClient.joined = false;
   roomClient.roomCode = "";
   roomClient.roomName = "";
@@ -2154,6 +2274,11 @@ async function deleteMailboxNotice(noticeId) {
 
 function showMainLobbyPage(message = "Choose or create a room.") {
   // Navigate back to the main room list from a lobby subpage.
+  if (PAGE_KIND === "game") {
+    goToLobby(message);
+    return;
+  }
+
   roomClient.lobbyView = "rooms";
   game.phase = "lobby";
   render();
@@ -2239,7 +2364,7 @@ function submitTurn(autoSubmit) {
     guessRGB: guess
   });
   els.statusLine.textContent = "Submitted. Waiting for reveal...";
-  const submitButton = document.getElementById("submitButton");
+  const submitButton = byId("submitButton");
   if (submitButton) submitButton.disabled = true;
 }
 
@@ -2289,6 +2414,7 @@ function handleRoomList(data) {
     Server event: room_list.
     This is the main lobby list of rooms that are currently waiting for players.
   */
+  if (!IS_LOBBY_PAGE && PAGE_KIND !== "combined") return;
   roomClient.rooms = data?.rooms || [];
   if (game.phase === "lobby") renderLobby();
 }
@@ -2767,6 +2893,13 @@ if (PREVIEW_GAME_SCREEN) {
   // Basic connection lifecycle events.
   // 수정 예정
   socket.on("connect", () => {
+    if (PAGE_KIND === "game") {
+      if (!runPendingRoomAction()) {
+        goToLobby("Choose or create a room.");
+      }
+      return;
+    }
+
     setLobbyStatus("Connected. Join or create a room.");
     socket.emit("request_room_list");
   });
@@ -2807,6 +2940,7 @@ if (PREVIEW_GAME_SCREEN) {
 
 // Initial paint. Without this call, the page would keep only the raw HTML defaults.
 render();
+restoreLobbyStatus();
 if (currentUserFromSession) {
   startPresenceTracking();
   loadMailboxNoticesFromDb(false);

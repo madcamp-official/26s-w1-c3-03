@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Color Master - 시작하기</title>
+  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body>
+  <main class="container">
+    <div id="main-section">
+      <div class="main-title-box">
+        <h1>Color Master</h1>
+      </div>
+      <div class="main-btn-group">
+        <button id="nav-to-login" type="button">로그인</button>
+        <button id="nav-to-guest" type="button">게스트 로그인</button>
+      </div>
+      <span class="main-signup-link" id="nav-to-signup">회원가입</span>
+    </div>
+
+    <div id="login-section" class="hidden">
+      <h2>로그인</h2>
+      <div class="input-group">
+        <label for="login-id">아이디</label>
+        <input type="text" id="login-id" placeholder="아이디 입력">
+      </div>
+      <div class="input-group">
+        <label for="login-password">비밀번호</label>
+        <input type="password" id="login-password" placeholder="비밀번호 입력">
+      </div>
+      <button id="btn-login" class="primary-btn" type="button">로그인</button>
+      <button id="btn-google-login" class="primary-btn btn-google" type="button">구글로 시작하기</button>
+      <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
+    </div>
+
+    <div id="guest-login-section" class="hidden">
+      <h2>게스트 로그인</h2>
+      <p class="auth-helper">빠르게 게임을 시작할 닉네임을 입력하세요.</p>
+      <div class="input-group">
+        <label for="guest-nickname">닉네임</label>
+        <input type="text" id="guest-nickname" placeholder="사용할 닉네임 입력">
+      </div>
+      <button id="btn-guest-login-submit" class="primary-btn" type="button">게스트로 시작</button>
+      <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
+    </div>
+
+    <div id="signup-section" class="hidden">
+      <h2>이메일 회원가입</h2>
+      <div class="input-group">
+        <label for="signup-id">아이디</label>
+        <input type="text" id="signup-id" placeholder="사용할 아이디">
+        <button class="btn-secondary" id="btn-check-id" type="button">중복 확인</button>
+        <span id="id-status" class="auth-status"></span>
+      </div>
+      <div class="input-group">
+        <label for="signup-nickname">닉네임</label>
+        <input type="text" id="signup-nickname" placeholder="사용할 닉네임">
+        <button class="btn-secondary" id="btn-check-nickname" type="button">중복 확인</button>
+        <span id="nickname-status" class="auth-status"></span>
+      </div>
+      <div class="input-group">
+        <label for="signup-email">이메일</label>
+        <input type="email" id="signup-email" placeholder="이메일 입력">
+      </div>
+      <div class="input-group">
+        <label for="signup-password">비밀번호</label>
+        <input type="password" id="signup-password" placeholder="8~12자 (영문, 숫자, 특수문자)">
+      </div>
+      <div class="input-group">
+        <label for="signup-profile-file">프로필 사진 (선택)</label>
+        <input type="file" id="signup-profile-file" accept="image/*">
+      </div>
+      <button id="btn-signup" class="primary-btn" type="button">회원가입 완료</button>
+      <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
+    </div>
+
+    <div id="google-signup-section" class="hidden">
+      <h2>구글 회원가입 추가 정보</h2>
+      <p class="auth-helper">구글 연동이 완료되었습니다. 게임 정보를 입력해주세요.</p>
+      <div class="input-group">
+        <label for="g-signup-email">이메일</label>
+        <input type="email" id="g-signup-email" disabled>
+      </div>
+      <div class="input-group">
+        <label for="g-signup-id">아이디</label>
+        <input type="text" id="g-signup-id" placeholder="사용할 아이디">
+        <button class="btn-secondary" id="btn-g-check-id" type="button">중복 확인</button>
+        <span id="g-id-status" class="auth-status"></span>
+      </div>
+      <div class="input-group">
+        <label for="g-signup-nickname">닉네임</label>
+        <input type="text" id="g-signup-nickname" placeholder="사용할 닉네임">
+        <button class="btn-secondary" id="btn-g-check-nickname" type="button">중복 확인</button>
+        <span id="g-nickname-status" class="auth-status"></span>
+      </div>
+      <div class="input-group">
+        <label for="g-signup-profile-file">프로필 사진 변경 (선택)</label>
+        <input type="file" id="g-signup-profile-file" accept="image/*">
+      </div>
+      <button id="btn-g-signup-complete" class="primary-btn" type="button">구글 가입 완료</button>
+      <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
+    </div>
+  </main>
+
+  <script type="module" src="auth.js"></script>
+</body>
+</html>

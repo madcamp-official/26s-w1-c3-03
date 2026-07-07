@@ -1,0 +1,94 @@
+@font-face {
+  font-family: "ColorMasterRound";
+  src: local("Pretendard Variable"), local("Pretendard");
+}
+
+:root {
+  --page: #070816;
+  --panel: rgba(18, 22, 44, 0.82);
+  --panel-strong: rgba(24, 30, 61, 0.94);
+  --panel-soft: rgba(255, 255, 255, 0.08);
+  --glass: rgba(255, 255, 255, 0.12);
+  --line: rgba(255, 255, 255, 0.16);
+  --line-strong: rgba(255, 255, 255, 0.28);
+  --ink: #f7f8ff;
+  --muted: #aeb6d8;
+  --soft: rgba(255, 255, 255, 0.10);
+  --red: #ff4d62;
+  --green: #2eea8a;
+  --blue: #4b7dff;
+  --tier-blue: #4f7dff;
+  --tier-green: #36e891;
+  --tier-yellow: #f7e65a;
+  --tier-orange: #ff9d3d;
+  --tier-red: #ff4c64;
+  --warning: #ff7588;
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.36);
+  --glow-blue: 0 0 28px rgba(82, 126, 255, 0.44);
+  --glow-pink: 0 0 28px rgba(255, 72, 184, 0.34);
+  --value-box-size: 58px;
+  font-family: "Pretendard Variable", Pretendard, ColorMasterRound, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 18% 14%, rgba(44, 230, 255, 0.28), transparent 26%),
+    radial-gradient(circle at 86% 26%, rgba(255, 71, 170, 0.26), transparent 31%),
+    radial-gradient(circle at 50% 100%, rgba(89, 255, 138, 0.18), transparent 35%),
+    var(--page);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle, black 20%, transparent 78%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.app {
+  width: min(100%, 1120px);
+}
+
+/* Hidden but accessible title updated by JavaScript for the current screen state. */
+.screen-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

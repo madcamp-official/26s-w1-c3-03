@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color Master - Game</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.min.css" />
+  <link rel="stylesheet" href="common.css" />
+  <link rel="stylesheet" href="game.css" />
+</head>
+<body data-page="game">
+  <main class="app">
+    <h1 class="screen-title" id="screenTitle">Color Master Game</h1>
+    <section class="lobby-screen" id="lobbyScreen" aria-label="Color Master waiting room">
+      <div class="lobby-card">
+        <!-- Waiting lobby: shown after this browser joins one room. -->
+        <section class="waiting-lobby-panel" id="waitingLobbyPanel" aria-label="Players waiting in room" hidden>
+          <div class="waiting-header">
+            <div>
+              <h3 class="lobby-section-title" id="waitingRoomTitle">Waiting Room</h3>
+              <p class="waiting-room-meta" id="waitingRoomMeta"></p>
+            </div>
+            <button class="lobby-button lobby-button-secondary" id="leaveRoomButton" type="button">Leave</button>
+          </div>
+
+          <!-- Empty on purpose: JavaScript fills this with the current waiting players. -->
+          <div class="lobby-player-list" id="lobbyPlayersList"></div>
+
+          <!-- JavaScript shows this only for the host and enables it when at least two players are present. -->
+          <button class="lobby-button" id="startGameButton" type="button" disabled hidden>Start Game</button>
+        </section>
+      </div>
+
+      <!-- Invite-friend popup. It opens from empty player slots in the waiting lobby. -->
+      <div class="invite-friend-layer" id="inviteFriendLayer" hidden>
+        <div class="invite-friend-panel" role="dialog" aria-modal="true" aria-labelledby="inviteFriendTitle">
+          <div class="invite-friend-header">
+            <div>
+              <p class="eyebrow">ONLINE FRIENDS</p>
+              <h3 class="lobby-section-title" id="inviteFriendTitle">Invite Friend</h3>
+            </div>
+            <button class="invite-friend-close-button" id="closeInviteFriendButton" type="button" aria-label="Close invite friend">
+              <img class="invite-friend-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
+          </div>
+
+          <p class="lobby-status" id="inviteFriendStatus" aria-live="polite">Choose an online friend to invite.</p>
+
+          <div class="invite-friend-table-wrap">
+            <table class="invite-friend-table">
+              <thead>
+                <tr>
+                  <th>Index</th>
+                  <th>Profile</th>
+                  <th>Nickname</th>
+                  <th>Invite</th>
+                </tr>
+              </thead>
+              <tbody id="inviteFriendTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </section>
+    <!-- Main game board. JavaScript shows it after the waiting room phase. -->
+    <section class="game-board" id="gameBoard" aria-label="Color Master game screen" hidden>
+      <div class="ambient ambient-one" aria-hidden="true"></div>
+      <div class="ambient ambient-two" aria-hidden="true"></div>
+
+      <button class="exit-button" id="exitButton" type="button" aria-label="Exit game">
+        <img class="exit-icon" src="/Images/exit_icon.png" alt="" />
+      </button>
+
+      <div class="volume-control" id="volumeControl">
+        <div class="volume-slider-wrap" id="volumeSliderWrap" hidden>
+          <input class="volume-slider" id="volumeSlider" type="range" min="0" max="100" value="70" aria-label="Volume" />
+        </div>
+        <button class="volume-button" id="volumeButton" type="button" aria-label="Volume" aria-expanded="false">
+          <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+        </button>
+      </div>
+
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">REAL-TIME RGB GUESS</p>
+          <h2 class="game-title">Color Master</h2>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <div class="round-card">
+          <span class="round-caption">Current Round</span>
+          <h2 class="round-label" id="roundLabel">Round 1</h2>
+        </div>
+
+        <div class="timer" aria-live="polite">
+          <div class="timer-inner">
+            <span class="timer-number" id="timerNumber">30</span>
+            <span class="timer-caption" id="timerCaption">SECONDS</span>
+          </div>
+        </div>
+
+        <section class="player-panel" aria-label="Players">
+          <div class="panel-heading">
+            <span>Players</span>
+          </div>
+          <div class="players" id="playersList"></div>
+        </section>
+      </aside>
+
+      <section class="play-area">
+        <div class="target-card">
+          <div class="card-label">TARGET IMAGE</div>
+          <div class="image-stage" id="targetImage" role="img" aria-label="Target color image"></div>
+          <p class="target-helper">Guess the average RGB value of the target image.</p>
+        </div>
+
+        <div class="guess-card">
+          <div class="guess-header">
+            <span>RGB Guess</span>
+            <small>Enter values from 0 to 255</small>
+          </div>
+          <div class="rgb-controls" id="rgbControls"></div>
+          <p class="status-line" id="statusLine" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <aside class="right-rail">
+        <section class="guide-card" aria-label="RGB color guide">
+          <div class="panel-heading">
+            <span>Color Guide</span>
+          </div>
+          <img class="guide-image" src="/Images/rgb_guide.png" alt="RGB color guide" />
+        </section>
+
+        <section class="legend-card" aria-label="Error color guide">
+          <div class="panel-heading">
+            <span>Error Guide</span>
+          </div>
+          <div class="legend">
+            <div class="legend-row"><span>Error = 0</span><span class="legend-dot dot-blue"></span></div>
+            <div class="legend-row"><span>Error &lt;= 10</span><span class="legend-dot dot-green"></span></div>
+            <div class="legend-row"><span>Error &lt;= 50</span><span class="legend-dot dot-yellow"></span></div>
+            <div class="legend-row"><span>Error &lt;= 150</span><span class="legend-dot dot-orange"></span></div>
+            <div class="legend-row"><span>Error &lt;= 255</span><span class="legend-dot dot-red"></span></div>
+          </div>
+        </section>
+      </aside>
+
+      <div class="choice-layer" id="choiceLayer" hidden>
+        <div class="choice-card" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
+          <div class="choice-popup-timer" aria-live="polite">
+            <span class="choice-popup-time" id="choicePopupTime">10</span>
+            <span class="choice-popup-caption">SECONDS</span>
+          </div>
+          <button class="choice-close" id="closeChoice" type="button" aria-label="Close choice popup">x</button>
+          <p class="modal-kicker">PEEK PHASE</p>
+          <h3 class="choice-title" id="choiceTitle">Choose one color channel</h3>
+          <div class="choice-buttons" id="choiceButtons"></div>
+        </div>
+      </div>
+
+      <div class="final-layer" id="finalLayer" hidden>
+        <div class="final-modal" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
+          <div class="final-popup-timer" aria-live="polite">
+            <span class="final-popup-time" id="finalPopupTime">30</span>
+            <span class="final-popup-caption">SECONDS</span>
+          </div>
+          <p class="modal-kicker">FINAL GUESS</p>
+          <h4 class="final-title" id="finalTitle">Final Guess</h4>
+          <div class="final-target-image" id="finalTargetImage" role="img" aria-label="Final target color"></div>
+          <div class="final-inputs" aria-label="Final RGB input">
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="r">255</div>
+              <div class="chevron" aria-hidden="true">&le;</div>
+              <div class="value-entry">
+                <input class="value-box is-red" id="final-r" data-final-channel="r" type="number" inputmode="numeric" min="0" max="255" aria-label="Final R value" />
+                <span class="value-label" aria-hidden="true">R</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">&le;</div>
+              <div class="bound" data-final-bound-low="r">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="g">255</div>
+              <div class="chevron" aria-hidden="true">&le;</div>
+              <div class="value-entry">
+                <input class="value-box is-green" id="final-g" data-final-channel="g" type="number" inputmode="numeric" min="0" max="255" aria-label="Final G value" />
+                <span class="value-label" aria-hidden="true">G</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">&le;</div>
+              <div class="bound" data-final-bound-low="g">0</div>
+            </div>
+            <div class="final-channel">
+              <div class="bound" data-final-bound-high="b">255</div>
+              <div class="chevron" aria-hidden="true">&le;</div>
+              <div class="value-entry">
+                <input class="value-box is-blue" id="final-b" data-final-channel="b" type="number" inputmode="numeric" min="0" max="255" aria-label="Final B value" />
+                <span class="value-label" aria-hidden="true">B</span>
+              </div>
+              <div class="chevron up" aria-hidden="true">&le;</div>
+              <div class="bound" data-final-bound-low="b">0</div>
+            </div>
+          </div>
+          <button class="final-submit-button" id="submitFinalButton" type="button">Submit Final Guess</button>
+          <p class="final-status" id="finalStatus" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <div class="result-layer" id="resultLayer" hidden>
+        <div class="result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+          <p class="modal-kicker">RESULT</p>
+          <h3 class="result-title" id="resultTitle">Game Result</h3>
+          <div class="result-text" id="resultText" aria-live="polite"></div>
+          <button class="result-button" id="closeResult" type="button">Close</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>

@@ -1,120 +1,4 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <title>Color Master - 시작하기</title>
-  <!-- 분리한 CSS 파일들을 연결합니다 -->
-  <link rel="stylesheet" href="common.css">
-  <link rel="stylesheet" href="auth.css"> 
-</head>
-<body>
-
-<div class="container">
-  
-  <!-- 0. 메인 화면 -->
-  <div id="main-section">
-    <div class="main-title-box">
-      <h1>Color Master</h1>
-    </div>
-    <div class="main-btn-group">
-      <button id="nav-to-login">로그인</button>
-      <button id="nav-to-guest">게스트로그인</button>
-    </div>
-    <span class="main-signup-link" id="nav-to-signup">회원가입</span>
-  </div>
-
-  <!-- 1. 일반 로그인 화면 -->
-  <div id="login-section" class="hidden">
-    <h2 style="text-align: center;">로그인</h2>
-    <div class="input-group">
-      <label>아이디</label>
-      <input type="text" id="login-id" placeholder="아이디 입력">
-    </div>
-    <div class="input-group">
-      <label>비밀번호</label>
-      <input type="password" id="login-password" placeholder="비밀번호 입력">
-    </div>
-    <button id="btn-login" class="primary-btn">로그인</button>
-    <button id="btn-google-login" class="primary-btn btn-google">구글로 시작하기</button>
-    <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
-  </div>
-
-  <!-- 2. 게스트 로그인 화면 -->
-  <div id="guest-login-section" class="hidden">
-    <h2 style="text-align: center;">게스트 로그인</h2>
-    <p style="font-size: 13px; color: #666; text-align: center;">빠르게 게임을 시작할 닉네임을 입력하세요.</p>
-    <div class="input-group">
-      <label>닉네임</label>
-      <input type="text" id="guest-nickname" placeholder="사용할 닉네임 입력">
-    </div>
-    <button id="btn-guest-login-submit" class="primary-btn">게스트로 시작</button>
-    <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
-  </div>
-
-  <!-- 3. 일반 이메일 회원가입 화면 -->
-  <div id="signup-section" class="hidden">
-    <h2 style="text-align: center;">이메일 회원가입</h2>
-    <div class="input-group">
-      <label>아이디</label>
-      <input type="text" id="signup-id" placeholder="사용할 아이디">
-      <button class="btn-secondary" id="btn-check-id">중복확인</button>
-      <span id="id-status" style="font-size:12px; color:red;"></span>
-    </div>
-    <div class="input-group">
-      <label>닉네임</label>
-      <input type="text" id="signup-nickname" placeholder="사용할 닉네임">
-      <button class="btn-secondary" id="btn-check-nickname">중복확인</button>
-      <span id="nickname-status" style="font-size:12px; color:red;"></span>
-    </div>
-    <div class="input-group">
-      <label>이메일</label>
-      <input type="email" id="signup-email" placeholder="이메일 입력">
-    </div>
-    <div class="input-group">
-      <label>비밀번호</label>
-      <input type="password" id="signup-password" placeholder="8~12자 (영문, 숫자, 특수문자)">
-    </div>
-    <div class="input-group">
-      <label>프로필 사진 (선택)</label>
-      <input type="file" id="signup-profile-file" accept="image/*">
-    </div>
-    <button id="btn-signup" class="primary-btn">회원가입 완료</button>
-    <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
-  </div>
-
-  <!-- 4. 구글 신규 유저 추가 정보 입력 화면 -->
-  <div id="google-signup-section" class="hidden">
-    <h2 style="text-align: center;">구글 회원가입 추가 정보</h2>
-    <p style="font-size: 13px; color: #666; text-align: center;">구글 연동이 완료되었습니다. 게임 정보를 입력해주세요.</p>
-    <div class="input-group">
-      <label>이메일</label>
-      <input type="email" id="g-signup-email" disabled>
-    </div>
-    <div class="input-group">
-      <label>아이디</label>
-      <input type="text" id="g-signup-id" placeholder="사용할 아이디">
-      <button class="btn-secondary" id="btn-g-check-id">중복확인</button>
-      <span id="g-id-status" style="font-size:12px; color:red;"></span>
-    </div>
-    <div class="input-group">
-      <label>닉네임</label>
-      <input type="text" id="g-signup-nickname" placeholder="사용할 닉네임">
-      <button class="btn-secondary" id="btn-g-check-nickname">중복확인</button>
-      <span id="g-nickname-status" style="font-size:12px; color:red;"></span>
-    </div>
-    <div class="input-group">
-      <label>프로필 사진 변경 (선택)</label>
-      <input type="file" id="g-signup-profile-file" accept="image/*">
-    </div>
-    <button id="btn-g-signup-complete" class="primary-btn">구글 가입 완료</button>
-    <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
-  </div>
-
-</div>
-
-<!-- 자바스크립트 연동 -->
-<script type="module">
-  import { 
+import { 
     signUpWithEmail, 
     login, 
     loginWithGoogle, 
@@ -127,13 +11,11 @@
   // 상태 관리 변수 (중복 확인 통과 여부)
   let isIdValid = false;
   let isNicknameValid = false;
-
-  // 구글 신규 가입 시 임시 저장용 데이터
   let tempGoogleData = null;
 
   const GAME_PAGE_URL = window.location.protocol === "file:"
-    ? "Public/colormaster_redesign.html"
-    : "/colormaster_redesign.html";
+    ? "lobby.html"
+    : "/lobby.html";
 
   // ---------------------------------------------------
   // 화면 내부 전환 (SPA 방식)
@@ -259,6 +141,29 @@
   // 유저가 값을 다시 수정하면 통과 상태 초기화
   document.getElementById('signup-id').addEventListener('input', () => { isIdValid = false; document.getElementById('id-status').innerText = ""; });
   document.getElementById('signup-nickname').addEventListener('input', () => { isNicknameValid = false; document.getElementById('nickname-status').innerText = ""; });
-</script>
-</body>
-</html>
+
+  document.getElementById('btn-g-check-id').addEventListener('click', async () => {
+    const idVal = document.getElementById('g-signup-id').value;
+    if (!idVal) return alert("아이디를 입력하세요.");
+    const isDup = await checkIdDuplicate(idVal);
+    const status = document.getElementById('g-id-status');
+    status.innerText = isDup ? "이미 사용 중인 아이디입니다." : "사용 가능한 아이디입니다.";
+    status.style.color = isDup ? "red" : "green";
+  });
+
+  document.getElementById('btn-g-check-nickname').addEventListener('click', async () => {
+    const nickVal = document.getElementById('g-signup-nickname').value;
+    if (!nickVal) return alert("닉네임을 입력하세요.");
+    const isDup = await checkNicknameDuplicate(nickVal);
+    const status = document.getElementById('g-nickname-status');
+    status.innerText = isDup ? "이미 사용 중인 닉네임입니다." : "사용 가능한 닉네임입니다.";
+    status.style.color = isDup ? "red" : "green";
+  });
+
+  document.getElementById('g-signup-id').addEventListener('input', () => {
+    document.getElementById('g-id-status').innerText = "";
+  });
+
+  document.getElementById('g-signup-nickname').addEventListener('input', () => {
+    document.getElementById('g-nickname-status').innerText = "";
+  });

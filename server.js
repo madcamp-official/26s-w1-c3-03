@@ -1,8 +1,9 @@
 /*
   Color Master backend server.
 
-  The browser code in colormaster_redesign.js controls the screen that each
-  player sees. This file controls the shared multiplayer state:
+  The browser code in Public/common.js, Public/lobby.js, and Public/game.js
+  controls the screens that each player sees. This file controls the shared
+  multiplayer state:
   - which rooms exist
   - who is in each room
   - whose turn it is
@@ -146,31 +147,50 @@ const activeRooms = new Map();
   - Images contains PNG assets used by the HTML.
 
   app.use(express.static(PUBLIC_DIR)) lets the browser request:
-  /colormaster_redesign.css
-  /colormaster_redesign.js
+  /auth.js
+  /lobby.js
+  /game.js
 
   app.use("/Images", express.static(IMAGE_DIR)) lets the browser request:
   /Images/exit_icon.png
 */
 const PUBLIC_DIR = path.join(__dirname, "Public");
 const IMAGE_DIR = path.join(__dirname, "Images");
-const LOGIN_HTML = path.join(__dirname, "index.html");
+const AUTH_HTML = path.join(PUBLIC_DIR, "auth.html");
+const LOBBY_HTML = path.join(PUBLIC_DIR, "lobby.html");
+const GAME_HTML = path.join(PUBLIC_DIR, "game.html");
 
-// Login files live at the project root, while the game files live in Public.
-app.get(["/login", "/index.html"], (_req, res) => {
-  res.sendFile(LOGIN_HTML);
+// Split top-level pages.
+app.get(["/", "/login", "/auth.html", "/index.html"], (_req, res) => {
+  res.sendFile(AUTH_HTML);
+});
+
+app.get("/lobby.html", (_req, res) => {
+  res.sendFile(LOBBY_HTML);
+});
+
+app.get("/game.html", (_req, res) => {
+  res.sendFile(GAME_HTML);
 });
 
 app.get("/login.js", (_req, res) => {
-  res.sendFile(path.join(__dirname, "login.js"));
+  res.sendFile(path.join(PUBLIC_DIR, "login.js"));
 });
 
 app.get("/auth.css", (_req, res) => {
-  res.sendFile(path.join(__dirname, "auth.css"));
+  res.sendFile(path.join(PUBLIC_DIR, "auth.css"));
 });
 
 app.get("/common.css", (_req, res) => {
-  res.sendFile(path.join(__dirname, "common.css"));
+  res.sendFile(path.join(PUBLIC_DIR, "common.css"));
+});
+
+app.get("/lobby.css", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "lobby.css"));
+});
+
+app.get("/game.css", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "game.css"));
 });
 
 app.post("/api/profile-image", upload.single("profileImage"), async (req, res) => {
@@ -269,11 +289,6 @@ app.get("/api/profile-image-file", async (req, res) => {
     console.error("Profile image proxy failed:", error);
     res.status(500).send("Profile image proxy failed.");
   }
-});
-
-// When the user opens http://localhost:3000/, send the main game HTML.
-app.get("/", (_req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "colormaster_redesign.html"));
 });
 
 app.use(express.static(PUBLIC_DIR));
