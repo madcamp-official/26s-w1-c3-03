@@ -1385,7 +1385,7 @@ input.value-box:focus {
   line-height: 1.45;
 }
 
-.popup-close,
+/* .popup-close, */
 .choice-close-button {
   position: absolute;
   top: 12px;
@@ -1394,11 +1394,6 @@ input.value-box:focus {
   height: 25px;
   display: grid;
   place-items: center;
-  /* border-radius: 12px;
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.76);
-  font-size: 22px;
-  line-height: 1; */
 }
 
 .choice-layer,

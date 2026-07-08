@@ -1269,6 +1269,11 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
   object-fit: contain;
 }
 
+.private-room-code-close-button {
+  top: 14px;
+  right: 14px;
+}
+
 .user-info-title {
   padding-right: 48px;
 }
