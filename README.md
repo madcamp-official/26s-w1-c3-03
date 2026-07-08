@@ -78,11 +78,12 @@
 <img width="1680" height="1184" alt="Image" src="https://github.com/user-attachments/assets/77b8fcc1-981b-4968-bcc9-58cb85bce2f3" />
 
 ### 화면 설계서
-<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/deb5d6e7-d90a-46b3-8e7a-96c261b5b9d6" />
-<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/563d753b-8a0a-4076-9a50-f9daa192c0ce" />
-<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/cda0bc97-11d4-474c-a66c-651358dc3183" />
-<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/63d65647-8801-4ffc-99c6-46eb146f0252" />
-<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/f03231dc-fca4-4bb6-9abb-937356782790" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/6b417b5b-350c-47d0-9f2e-3e1a9a959540" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/324fb41d-623a-442b-80d8-5bdc45a2f6e1" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/05f5ab38-bfdb-4a9e-83bd-008e050d3388" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/8263f6b4-c891-494b-86b3-8bbcf5a4660f" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/21a73761-c6a3-4565-b4b5-75eee13e4084" />
+<img width="3505" height="2480" alt="Image" src="https://github.com/user-attachments/assets/8c10de03-cb58-45a0-aae1-516a02a3c56f" />
 
 <img width="2164" height="1415" alt="Image" src="https://github.com/user-attachments/assets/5173c06b-38b2-4e5b-92f5-fd72ae66ee2b" />
 
