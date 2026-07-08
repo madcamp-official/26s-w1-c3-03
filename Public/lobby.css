@@ -1358,6 +1358,18 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
   font-weight: 850;
 }
 
+.user-info-table col.user-info-col-label {
+  width: 112px;
+}
+
+.user-info-table col.user-info-col-input {
+  width: 320px;
+}
+
+.user-info-table col.user-info-col-action {
+  width: 96px;
+}
+
 .user-info-table th,
 .user-info-table td {
   padding: 10px;
@@ -1375,12 +1387,7 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
   padding-top: 18px;
 }
 
-.user-info-table td:nth-child(2) {
-  width: 320px;
-}
-
 .user-info-table td:last-child {
-  width: 96px;
   padding-top: 10px;
 }
 
@@ -1425,6 +1432,10 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
 .user-info-edit-button {
   min-width: 72px;
   text-align: center;
+}
+
+.user-info-wide-cell {
+  width: auto;
 }
 
 .user-info-edit-button.is-confirming {

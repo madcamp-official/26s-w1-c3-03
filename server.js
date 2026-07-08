@@ -552,6 +552,7 @@ function publicPlayers(room) {
     nickname: player.nickname,
     index,
     point: Number(player.point) || 0,
+    profile_image: player.profileImage || "profile.png",
     isHost: player.socketId === room.hostSocketId,
     hasPeeked: room.peekedUsers.has(player.userId),
     isReady: player.isReady || false,
@@ -559,16 +560,32 @@ function publicPlayers(room) {
   }));
 }
 
-async function loadUserPoint(userId, fallbackPoint = 0) {
-  if (!userId || !adminDb) return Number(fallbackPoint) || 0;
+async function loadUserPublicData(userId, fallbackPoint = 0, fallbackProfileImage = "profile.png") {
+  if (!userId || !adminDb) {
+    return {
+      point: Number(fallbackPoint) || 0,
+      profileImage: fallbackProfileImage || "profile.png"
+    };
+  }
 
   try {
     const userDoc = await adminDb.collection("User").doc(String(userId)).get();
-    if (!userDoc.exists) return Number(fallbackPoint) || 0;
-    return Number(userDoc.data()?.point) || 0;
+    if (!userDoc.exists) {
+      return {
+        point: Number(fallbackPoint) || 0,
+        profileImage: fallbackProfileImage || "profile.png"
+      };
+    }
+    return {
+      point: Number(userDoc.data()?.point) || 0,
+      profileImage: String(userDoc.data()?.profile_image || fallbackProfileImage || "profile.png")
+    };
   } catch (error) {
-    console.error("Failed to load user point:", error);
-    return Number(fallbackPoint) || 0;
+    console.error("Failed to load user public data:", error);
+    return {
+      point: Number(fallbackPoint) || 0,
+      profileImage: fallbackProfileImage || "profile.png"
+    };
   }
 }
 
@@ -663,7 +680,7 @@ function createRoom(roomCode, hostSocketId, options = {}) {
   };
 }
 
-function addOrUpdatePlayer(room, socket, userId, nickname, point = 0) {
+function addOrUpdatePlayer(room, socket, userId, nickname, point = 0, profileImage = "profile.png") {
   /*
     Add a new player to a waiting room, or update the socket id if the same
     browser joins again before the game starts.
@@ -673,6 +690,7 @@ function addOrUpdatePlayer(room, socket, userId, nickname, point = 0) {
     existingPlayer.socketId = socket.id;
     existingPlayer.nickname = nickname;
     existingPlayer.point = Number(point) || 0;
+    existingPlayer.profileImage = profileImage || "profile.png";
     return true;
   }
 
@@ -685,6 +703,7 @@ function addOrUpdatePlayer(room, socket, userId, nickname, point = 0) {
     userId,
     nickname,
     point: Number(point) || 0,
+    profileImage: profileImage || "profile.png",
     isReady: false,
     disconnected: false,
     boundaries: createBoundaries(),
@@ -994,6 +1013,7 @@ async function endGame(room) {
   const results = sortedPlayers.map((player, index) => ({
     userId: player.userId,
     nickname: player.nickname,
+    profile_image: player.profileImage || "profile.png",
     rank: index + 1,
     earnedPoint: pointArray[index] || 0,
     finalError: player.finalSubmitted ? player.finalErrorSum : null,
@@ -1148,7 +1168,7 @@ io.on("connection", (socket) => {
     respond({ ok: true });
   });
 
-  socket.on("create_room", async ({ roomName, roomCode, level, maxPlayers, userId, nickname, point }) => {
+  socket.on("create_room", async ({ roomName, roomCode, level, maxPlayers, userId, nickname, point, profileImage }) => {
     /*
       create_room is sent from the create-room popup.
       The creator is automatically added to the new waiting room and becomes host.
@@ -1166,14 +1186,14 @@ io.on("connection", (socket) => {
     });
 
     activeRooms.set(generatedRoomCode, room);
-    const currentPoint = await loadUserPoint(cleanUserId, point);
-    addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, currentPoint);
+    const userPublicData = await loadUserPublicData(cleanUserId, point, profileImage);
+    addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, userPublicData.point, userPublicData.profileImage);
     socket.join(generatedRoomCode);
     emitRoomUpdate(room);
     emitRoomList();
   });
 
-  socket.on("join_room", async ({ roomCode, privateCode, userId, nickname, point }) => {
+  socket.on("join_room", async ({ roomCode, privateCode, userId, nickname, point, profileImage }) => {
     /*
       join_room is sent from the lobby.
 
@@ -1198,8 +1218,8 @@ io.on("connection", (socket) => {
       sendError(socket, "올바르지 않은 방 코드입니다.");
       return;
     }
-    const currentPoint = await loadUserPoint(cleanUserId, point);
-    if (!addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, currentPoint)) {
+    const userPublicData = await loadUserPublicData(cleanUserId, point, profileImage);
+    if (!addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, userPublicData.point, userPublicData.profileImage)) {
       sendError(socket, "방 인원이 다 찼습니다.");
       return;
     }

@@ -1094,6 +1094,7 @@ function playersFromServer(players) {
     name: player.nickname,
     isHost: player.isHost,
     hasPeeked: Boolean(player.hasPeeked),
+    profileImage: normalizeProfileImage(player.profile_image || player.profileImage),
     rankingPoint: Number(player.rankingPoint || player.point || 0), // RP 추가
     isReady: Boolean(player.isReady) // 준비 상태 추가
   }));
@@ -1989,7 +1990,9 @@ function resultTableRows() {
     .map((result, index) => {
       // 대기실에서 받아두었던 game.players 배열에서 해당 유저의 프로필 사진을 찾습니다.
       const playerInfo = game.players.find(p => p.id === result.userId) || {};
-      const profileImg = playerInfo.profileImage ? normalizeProfileImage(playerInfo.profileImage) : "/Images/profile.png";
+      const profileImg = normalizeProfileImage(
+        result.profile_image || result.profileImage || playerInfo.profileImage || "/Images/profile.png"
+      );
       
       // 서버에서 계산해서 보내준 '이번 게임 획득 포인트(earnedPoint)'를 사용합니다.
       const earned = result.earnedPoint || 0;
@@ -2389,7 +2392,8 @@ function createRoomFromLobby() {
     maxPlayers: Number(els.maxPlayersSelect.value),
     userId: game.localPlayerId,
     nickname: roomClient.nickname,
-    point: Number(mockCurrentUser.rankingPoint) || 0
+    point: Number(mockCurrentUser.rankingPoint) || 0,
+    profileImage: mockCurrentUser.profileImage
   };
 
   if (!IS_GAME_PAGE || IS_LOBBY_PAGE) {
@@ -2422,7 +2426,8 @@ function joinRoom(roomCode, privateCode = "") {
     privateCode,
     userId: game.localPlayerId,
     nickname: roomClient.nickname,
-    point: Number(mockCurrentUser.rankingPoint) || 0
+    point: Number(mockCurrentUser.rankingPoint) || 0,
+    profileImage: mockCurrentUser.profileImage
   };
 
   if (IS_LOBBY_PAGE) {
@@ -2473,7 +2478,8 @@ function runPendingRoomAction() {
       maxPlayers: Number(action.maxPlayers) || 5,
       userId: game.localPlayerId,
       nickname: roomClient.nickname,
-      point: Number(action.point) || Number(mockCurrentUser.rankingPoint) || 0
+      point: Number(action.point) || Number(mockCurrentUser.rankingPoint) || 0,
+      profileImage: action.profileImage || mockCurrentUser.profileImage
     });
     setLobbyStatus("Creating room...");
     return true;
@@ -2487,7 +2493,8 @@ function runPendingRoomAction() {
       privateCode: roomClient.privateCode,
       userId: game.localPlayerId,
       nickname: roomClient.nickname,
-      point: Number(action.point) || Number(mockCurrentUser.rankingPoint) || 0
+      point: Number(action.point) || Number(mockCurrentUser.rankingPoint) || 0,
+      profileImage: action.profileImage || mockCurrentUser.profileImage
     });
     setLobbyStatus("Joining room...");
     return true;

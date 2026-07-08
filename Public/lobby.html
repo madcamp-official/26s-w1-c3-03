@@ -347,16 +347,20 @@
           </div>
 
           <table class="user-info-table" aria-label="Editable user information">
+            <colgroup>
+              <col class="user-info-col-label" />
+              <col class="user-info-col-input" />
+              <col class="user-info-col-action" />
+            </colgroup>
             <tbody>
             <tr>
               <th scope="row">이메일</th>
-              <td>
+              <td class="user-info-wide-cell" colspan="2">
                 <div class="user-info-input-stack">
                   <input class="user-info-input" id="userInfoEmailInput" type="email" disabled />
                   <span class="user-info-status" data-user-info-status="userInfoEmailInput"></span>
                 </div>
               </td>
-              <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoEmailInput">수정</button></td>
             </tr>
             <tr>
               <th scope="row">닉네임</th>
