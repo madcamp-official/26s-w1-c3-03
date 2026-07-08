@@ -1248,7 +1248,7 @@ function renderInviteFriendList() {
   if (!onlineFriends.length) {
     els.inviteFriendTableBody.innerHTML = `
       <tr>
-        <td class="invite-friend-empty" colspan="4">온라인 친구가 없습니다.</td>
+        <td class="invite-friend-empty" colspan="4">접속 중인 친구가 없습니다.</td>
       </tr>
     `;
     return;
