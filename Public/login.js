@@ -686,3 +686,21 @@ export async function loginAsGuest(nickname) {
     return false;
   }
 }
+
+// ---------------------------------------------------
+// 9. 랭킹 포인트(RP) 업데이트 함수
+// ---------------------------------------------------
+export async function updateRankingPoint(userId, newPoint) {
+  try {
+    const userRef = doc(db, "User", userId);
+    
+    // 회원가입 시 'point' 필드로 초기화했으므로 동일한 필드명인 'point'를 업데이트합니다.
+    await updateDoc(userRef, {
+      point: newPoint 
+    });
+    
+    console.log(`DB 포인트 업데이트 완료: ${newPoint} RP`);
+  } catch (error) {
+    console.error("DB 포인트 업데이트 에러:", error);
+  }
+}

@@ -479,8 +479,7 @@
   display: none;
 }
 
-.invite-friend-close-button,
-.choice-close-button {
+.invite-friend-close-button {
   width: 25px;
   height: 25px;
   padding: 0;
@@ -494,13 +493,11 @@
   justify-self: end;
 }
 
-.invite-friend-close-button:hover,
-.choice-close-button:hover {
+.invite-friend-close-button:hover {
   opacity: 0.72;
 }
 
-.invite-friend-close-icon,
-.choice-close-icon {
+.invite-friend-close-icon {
   width: 25px;
   height: 25px;
   display: block;
@@ -1441,7 +1438,7 @@ input.value-box:focus {
   line-height: 1.45;
 }
 
-.popup-close,
+/* .popup-close, */
 .choice-close-button {
   position: absolute;
   top: 12px;
@@ -1450,11 +1447,6 @@ input.value-box:focus {
   height: 25px;
   display: grid;
   place-items: center;
-  /* border-radius: 12px;
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.76);
-  font-size: 22px;
-  line-height: 1; */
 }
 
 .choice-layer,
@@ -1864,7 +1856,8 @@ input.value-box:focus {
   background: rgba(255,255,255,0.08);
 }
 
-.result-modal .result-button {
+.result-modal .result-button,
+.choice-close-button {
   position: absolute;
   top: 18px;
   right: 18px;
