@@ -3014,6 +3014,20 @@ function handleGameOver(data) {
   if (mockCurrentUser && game.score.points) {
     mockCurrentUser.rankingPoint = Number(mockCurrentUser.rankingPoint || 0) + game.score.points;
     saveMockUser();
+
+    // --------------------------------------------------
+    // ▼ 추가된 부분: 게임 종료 후 변경된 RP를 Firestore DB에 즉시 반영
+    // --------------------------------------------------
+    if (!isGuestUser()) { // 게스트가 아닌 로그인 유저만 DB 업데이트
+      import(LOGIN_MODULE_URL).then(({ updateRankingPoint }) => {
+        if (updateRankingPoint) {
+          // 로컬에 계산된 최신 포인트를 DB에 전송
+          updateRankingPoint(mockCurrentUser.id, mockCurrentUser.rankingPoint);
+        }
+      }).catch((error) => {
+        console.error("DB 업데이트 모듈을 불러오지 못했습니다:", error);
+      });
+    }
   }
 
   render();
