@@ -271,19 +271,25 @@
       <div class="private-room-code-layer" id="privateRoomCodeLayer" hidden>
         <div class="private-room-code-panel" role="dialog" aria-modal="true" aria-labelledby="privateRoomCodeTitle">
           <div class="create-room-header">
-            <h3 class="lobby-section-title" id="privateRoomCodeTitle">Private Room</h3>
+            <h3 class="lobby-section-title" id="privateRoomCodeTitle">Room Code</h3>
             <!-- <button class="popup-close" id="closePrivateRoomCodeButton" type="button" aria-label="Close private room code">x</button> -->
-            <button class="popup-close" id="closePrivateRoomCodeButton" type="button" aria-label="Close private room code">
+            <button class="user-info-close-button private-room-code-close-button" id="closePrivateRoomCodeButton" type="button" aria-label="Close private room code">
               <img class="popup-close-icon" src="/Images/close_icon.png" alt="닫기" />
             </button>
           </div>
 
           <label class="lobby-field">
-            <span>Room Code</span>
             <input id="privateRoomCodeInput" type="text" autocomplete="off" maxlength="18" />
           </label>
 
           <button class="lobby-button private-room-code-submit-button" id="submitPrivateRoomCodeButton" type="button">Join Room</button>
+        </div>
+      </div>
+
+      <div class="lobby-alert-layer" id="lobbyAlertLayer" hidden>
+        <div class="lobby-alert-panel" role="dialog" aria-modal="true" aria-labelledby="lobbyAlertMessage">
+          <p class="lobby-alert-message" id="lobbyAlertMessage"></p>
+          <button class="lobby-button lobby-alert-button" id="lobbyAlertConfirmButton" type="button">확인</button>
         </div>
       </div>
 

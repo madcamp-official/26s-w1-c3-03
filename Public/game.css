@@ -792,7 +792,7 @@
 .volume-control {
   position: absolute;
   right: 40px;
-  bottom: 40px;
+  bottom: 28px;
   z-index: 12;
   display: flex;
   align-items: center;
@@ -1096,9 +1096,9 @@
   aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: 0;
-  border: 1px solid rgba(255,255,255,0.24);
+  border: 0;
   background: #d6d6d6;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
 }
 
 .target-helper {
@@ -1109,7 +1109,7 @@
 }
 
 .guess-card {
-  min-height: 228px;
+  min-height: 208px;
 }
 
 .rgb-controls {
@@ -1299,16 +1299,6 @@ input.value-box:focus {
   cursor: default;
   filter: grayscale(0.5);
   box-shadow: none;
-}
-
-.status-line,
-.final-status {
-  min-height: 20px;
-  margin: 12px 0 0;
-  color: var(--warning);
-  font-size: 13px;
-  font-weight: 750;
-  text-align: center;
 }
 
 .right-rail {
@@ -1517,16 +1507,16 @@ input.value-box:focus {
 .choice-popup-time {
   min-width: 2ch;
   text-align: center;
-  font-size: 30px;
-  line-height: 1;
+  font-size: 38px;
+  line-height: 0.92;
   font-weight: 950;
 }
 
 .choice-popup-caption {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
 }
 
 .choice-title,
@@ -1662,8 +1652,8 @@ input.value-box:focus {
 .final-popup-time {
   min-width: 2ch;
   text-align: center;
-  font-size: 25px;
-  line-height: 1;
+  font-size: 38px;
+  line-height: 0.92;
   font-weight: 950;
 }
 
@@ -1671,7 +1661,7 @@ input.value-box:focus {
   color: var(--muted);
   font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
 }
 
 .result-modal {
@@ -1745,12 +1735,7 @@ input.value-box:focus {
   transform: none;
   margin-bottom: 0;
   position: relative;
-  top: 17px;
-}
-
-.final-status {
-  min-height: 0;
-  margin-top: -3px;
+  top: 6px;
 }
 
 .result-text {
@@ -1771,7 +1756,7 @@ input.value-box:focus {
 .result-row-title {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 900;
 }
 
@@ -1783,6 +1768,27 @@ input.value-box:focus {
 
 .result-boxes .value-box {
   pointer-events: none;
+}
+
+.result-final-guess-cell {
+  min-width: 180px;
+}
+
+.result-final-boxes {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 48px);
+  gap: 8px;
+  justify-content: center;
+}
+
+.result-final-boxes .value-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 18px;
+  line-height: 48px;
+  pointer-events: none;
+  transform: none;
 }
 
 .result-total-error {
@@ -1809,7 +1815,7 @@ input.value-box:focus {
   min-width: 620px;
   border-collapse: collapse;
   color: #e9edff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 800;
   text-align: center;
 }
@@ -1824,9 +1830,34 @@ input.value-box:focus {
 
 .result-table th {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 950;
   text-transform: uppercase;
+}
+
+.result-table th:nth-child(1),
+.result-table td:nth-child(1) {
+  width: 80px;
+}
+
+.result-table th:nth-child(2),
+.result-table td:nth-child(2) {
+  width: 100px;
+}
+
+.result-table th:nth-child(3),
+.result-table td:nth-child(3) {
+  width: 250px;
+}
+
+.result-table th:nth-child(4),
+.result-table td:nth-child(4) {
+  width: 200px;
+}
+
+.result-table th:nth-child(5),
+.result-table td:nth-child(5) {
+  width: 100px;
 }
 
 .result-table tbody tr:last-child td {
@@ -1877,11 +1908,11 @@ input.value-box:focus {
 /* 비공개 방 자물쇠 아이콘 스타일 */
 .room-private-icon,
 .room-crown-icon {
-  width: 18px;         /* 글자 크기에 맞게 조절 (방 제목 크기가 크면 22px 등으로 키우셔도 됩니다) */
-  height: 18px;
+  width: 20px;         /* 글자 크기에 맞게 조절 (방 제목 크기가 크면 22px 등으로 키우셔도 됩니다) */
+  height: 20px;
   margin-left: 8px;    /* 텍스트와 아이콘 사이 간격 */
   vertical-align: middle; 
-  transform: translateY(-2px); /* 글자 중앙 십자선과 시각적으로 딱 맞게 미세 조정 */
+  transform: translateY(2px); /* 글자 중앙 십자선과 시각적으로 딱 맞게 미세 조정 */
   object-fit: contain;
 }
 

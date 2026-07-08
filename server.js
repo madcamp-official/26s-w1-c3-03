@@ -643,6 +643,7 @@ function createRoom(roomCode, hostSocketId, options = {}) {
     currentTurnData: null,
     peekedUsers: new Set(),
     finalSubmissions: new Set(),
+    finalSubmissionCounter: 0,
     disconnectedUserIds: new Set(),
     timerRef: null
   };
@@ -672,7 +673,9 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
     disconnected: false,
     boundaries: createBoundaries(),
     finalGuess: null,
-    finalErrorSum: null
+    finalErrorSum: null,
+    finalSubmitted: false,
+    finalSubmittedOrder: null
   });
   return true;
 }
@@ -684,6 +687,8 @@ function resetPlayerRoundState(room) {
     player.boundaries = createBoundaries();
     player.finalGuess = null;
     player.finalErrorSum = null;
+    player.finalSubmitted = false;
+    player.finalSubmittedOrder = null;
   });
 }
 
@@ -910,6 +915,7 @@ function startFinalGuess(room) {
   clearRoomTimer(room);
   room.phase = "FINAL_GUESS";
   room.finalSubmissions = new Set();
+  room.finalSubmissionCounter = 0;
   room.players.forEach((player) => {
     if (!player.disconnected) return;
     const cleanGuess = midpointGuess(player.boundaries);
@@ -917,6 +923,8 @@ function startFinalGuess(room) {
     const errors = errorsFor(target, cleanGuess);
     player.finalGuess = cleanGuess;
     player.finalErrorSum = errors.r + errors.g + errors.b;
+    player.finalSubmitted = true;
+    player.finalSubmittedOrder = room.finalSubmissionCounter += 1;
     room.finalSubmissions.add(player.userId);
   });
   emitRoomUpdate(room);
@@ -949,25 +957,32 @@ function endGame(room) {
   const target = room.targetData.average;
 
   room.players.forEach((player) => {
-    if (!player.finalGuess) {
-      // If a player did not submit, give them a default guess and score it.
-      player.finalGuess = { r: 0, g: 0, b: 0 };
-      player.finalErrorSum = Math.abs(target.r) + Math.abs(target.g) + Math.abs(target.b);
+    if (!player.finalSubmitted) {
+      // Players who never submitted are kept in the ranking but always placed last.
+      player.finalGuess = null;
+      player.finalErrorSum = Number.MAX_SAFE_INTEGER;
+      player.finalSubmittedOrder = Number.MAX_SAFE_INTEGER;
     }
   });
 
   // Sort connected players only. Disconnected players are not included in final ranking.
   const sortedPlayers = room.players
     .filter((player) => !player.disconnected)
-    .sort((a, b) => a.finalErrorSum - b.finalErrorSum);
+    .sort((a, b) => {
+      if (a.finalSubmitted !== b.finalSubmitted) return a.finalSubmitted ? -1 : 1;
+      if (a.finalErrorSum !== b.finalErrorSum) return a.finalErrorSum - b.finalErrorSum;
+      return (a.finalSubmittedOrder ?? Number.MAX_SAFE_INTEGER) - (b.finalSubmittedOrder ?? Number.MAX_SAFE_INTEGER);
+    });
   const pointArray = CONFIG.POINTS[sortedPlayers.length] || [];
   const results = sortedPlayers.map((player, index) => ({
     userId: player.userId,
     nickname: player.nickname,
     rank: index + 1,
     earnedPoint: pointArray[index] || 0,
-    finalError: player.finalErrorSum,
-    finalGuess: player.finalGuess
+    finalError: player.finalSubmitted ? player.finalErrorSum : null,
+    finalGuess: player.finalSubmitted ? player.finalGuess : null,
+    submittedFinalGuess: player.finalSubmitted,
+    finalSubmittedOrder: player.finalSubmittedOrder ?? null
   }));
 
   io.to(room.roomCode).emit("game_over", {
@@ -1027,6 +1042,8 @@ function removeSocketFromRoom(socket, room, notifyLeavingSocket = false) {
       const errors = errorsFor(target, cleanGuess);
       player.finalGuess = cleanGuess;
       player.finalErrorSum = errors.r + errors.g + errors.b;
+      player.finalSubmitted = true;
+      player.finalSubmittedOrder = room.finalSubmissionCounter += 1;
       room.finalSubmissions.add(player.userId);
       if (room.finalSubmissions.size >= room.players.length) {
         endGame(room);
@@ -1081,6 +1098,34 @@ io.on("connection", (socket) => {
     socket.emit("room_list", {
       rooms: publicRoomList()
     });
+  });
+
+  socket.on("validate_join_room", ({ roomCode, privateCode }, respond = () => {}) => {
+    /*
+      Lightweight join pre-check used by the lobby before moving to game.html.
+      This validates room existence, state, capacity, and private-room code
+      without actually adding the player to the room yet.
+    */
+    const cleanRoomCode = normalizeRoomCode(roomCode);
+    const room = activeRooms.get(cleanRoomCode);
+    if (!room) {
+      respond({ ok: false, message: "Room not found." });
+      return;
+    }
+    if (room.phase !== "WAITING") {
+      respond({ ok: false, message: "This room already started." });
+      return;
+    }
+    if (room.isPrivate && normalizeOptionalRoomCode(privateCode) !== room.joinCode) {
+      respond({ ok: false, message: "Incorrect room code." });
+      return;
+    }
+    if (room.players.length >= room.maxPlayers) {
+      respond({ ok: false, message: "This room is full." });
+      return;
+    }
+
+    respond({ ok: true });
   });
 
   socket.on("create_room", ({ roomName, roomCode, level, maxPlayers, userId, nickname }) => {
@@ -1303,6 +1348,8 @@ io.on("connection", (socket) => {
     const errors = errorsFor(target, cleanGuess);
     player.finalGuess = cleanGuess;
     player.finalErrorSum = errors.r + errors.g + errors.b;
+    player.finalSubmitted = true;
+    player.finalSubmittedOrder = room.finalSubmissionCounter += 1;
 
     room.finalSubmissions.add(player.userId);
 

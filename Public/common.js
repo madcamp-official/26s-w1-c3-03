@@ -1,4 +1,4 @@
-/*
+﻿/*
   Color Master frontend controller.
 
   Think of this file as the "brain" of the browser page:
@@ -81,6 +81,10 @@ const LOGIN_MODULE_URL = window.location.protocol === "file:" ? "login.js" : "/l
 const DEFAULT_PROFILE_IMAGE = "/Images/profile.png";
 const PENDING_ROOM_ACTION_KEY = "colorMasterPendingRoomAction";
 const INTERNAL_NAVIGATION_KEY = "colorMasterInternalNavigation";
+const LOBBY_ALERT_KEY = "colorMasterLobbyAlert";
+const REOPEN_PRIVATE_ROOM_KEY = "colorMasterReopenPrivateRoom";
+const AUTO_UNLOCK_BGM_KEY = "colorMasterAutoplayBgm";
+const BGM_RESUME_KEY = "colorMasterBgmResume";
 
 function normalizeProfileImage(profileImage) {
   /*
@@ -267,7 +271,7 @@ document.body?.classList.toggle("is-guest-user", isGuestUser());
 const bgmTracks = typeof Audio === "function"
   ? {
       lobby: new Audio("/BGM/Platformer.wav"),
-      game: new Audio("/BGM/Pipiripi.mp3")
+      game: new Audio("/BGM/En el pozo.mp3")
     }
   : {};
 
@@ -290,6 +294,37 @@ enableSoftLoop(bgmTracks.lobby, 0.12);
 let activeBgmName = "";
 let bgmUnlocked = false;
 let bgmVolume = clamp(Number(localStorage.getItem("colorMasterVolume") ?? 70), 0, 100);
+
+function currentBgmAudio() {
+  return activeBgmName ? bgmTracks[activeBgmName] || null : null;
+}
+
+function saveBgmResumeStateForNavigation(shouldResume = true) {
+  const audio = currentBgmAudio();
+  if (!audio || !bgmUnlocked) return;
+  sessionStorage.setItem(AUTO_UNLOCK_BGM_KEY, "true");
+  if (!shouldResume) {
+    sessionStorage.removeItem(BGM_RESUME_KEY);
+    return;
+  }
+  sessionStorage.setItem(BGM_RESUME_KEY, JSON.stringify({
+    trackName: activeBgmName,
+    currentTime: audio.currentTime || 0,
+    savedAt: Date.now()
+  }));
+}
+
+function takeBgmResumeState() {
+  try {
+    const raw = sessionStorage.getItem(BGM_RESUME_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(BGM_RESUME_KEY);
+    return JSON.parse(raw);
+  } catch (_error) {
+    sessionStorage.removeItem(BGM_RESUME_KEY);
+    return null;
+  }
+}
 
 function createMockProfileImage(nickname, hue) {
   /*
@@ -354,15 +389,28 @@ function takePendingRoomAction() {
 }
 
 function goToGameWithAction(action) {
+  saveBgmResumeStateForNavigation(false);
   savePendingRoomAction(action);
   markInternalNavigation();
   window.location.href = GAME_PAGE_URL;
 }
 
 function goToLobby(message = "") {
+  saveBgmResumeStateForNavigation(false);
   if (message) sessionStorage.setItem("colorMasterLobbyStatus", message);
   markInternalNavigation();
   window.location.href = LOBBY_PAGE_URL;
+}
+
+function saveLobbyAlert(message) {
+  if (!message) return;
+  sessionStorage.setItem(LOBBY_ALERT_KEY, String(message));
+}
+
+function savePrivateRoomRetry(roomCode = "") {
+  const cleanRoomCode = String(roomCode || "").trim().toUpperCase();
+  if (!cleanRoomCode) return;
+  sessionStorage.setItem(REOPEN_PRIVATE_ROOM_KEY, cleanRoomCode);
 }
 
 function restoreLobbyStatus() {
@@ -371,6 +419,27 @@ function restoreLobbyStatus() {
   if (!message) return;
   sessionStorage.removeItem("colorMasterLobbyStatus");
   setLobbyStatus(message);
+}
+
+function restorePrivateRoomRetry() {
+  if (PAGE_KIND !== "lobby") return;
+  const roomCode = sessionStorage.getItem(REOPEN_PRIVATE_ROOM_KEY);
+  if (!roomCode) return;
+  sessionStorage.removeItem(REOPEN_PRIVATE_ROOM_KEY);
+  openPrivateRoomCodeModal(roomCode);
+}
+
+function restoreLobbyAlert() {
+  if (PAGE_KIND !== "lobby") return;
+  const message = sessionStorage.getItem(LOBBY_ALERT_KEY);
+  if (!message) return;
+  sessionStorage.removeItem(LOBBY_ALERT_KEY);
+  showLobbyAlert(message);
+}
+
+function lobbyAlertMessageForError(message) {
+  if (message === "Incorrect room code.") return "올바르지 않은 방 코드입니다.";
+  return String(message || "문제가 발생했습니다.");
 }
 
 let leaderboardUsers = [];
@@ -395,6 +464,7 @@ function saveMockMailboxNotices() {
 }
 
 let mockMailboxNotices = loadMockMailboxNotices();
+let mailboxLoaded = false;
 let mailboxLoading = false;
 let mailboxLoadPromise = null;
 
@@ -442,7 +512,7 @@ async function loadMailboxNoticesFromDb(force = false) {
   if (mailboxLoadPromise) return mailboxLoadPromise;
 
   mailboxLoading = true;
-  const showLoadingState = force || (els.mailboxLayer && !els.mailboxLayer.hidden && !mockMailboxNotices.length);
+  const showLoadingState = !mailboxLoaded && !mockMailboxNotices.length;
   if (showLoadingState) renderMailboxNotices();
   if (els.mailboxStatus) els.mailboxStatus.textContent = "";
 
@@ -451,6 +521,7 @@ async function loadMailboxNoticesFromDb(force = false) {
     .then((dbNotices) => {
       mockMailboxNotices = dbNotices
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      mailboxLoaded = true;
       renderMailboxNotices();
       updateMailboxUnreadDots();
       if (els.mailboxStatus) els.mailboxStatus.textContent = "";
@@ -713,6 +784,9 @@ const els = {
   closePrivateRoomCodeButton: byId("closePrivateRoomCodeButton"),
   privateRoomCodeInput: byId("privateRoomCodeInput"),
   submitPrivateRoomCodeButton: byId("submitPrivateRoomCodeButton"),
+  lobbyAlertLayer: byId("lobbyAlertLayer"),
+  lobbyAlertMessage: byId("lobbyAlertMessage"),
+  lobbyAlertConfirmButton: byId("lobbyAlertConfirmButton"),
   nicknameInput: byId("nicknameInput"),
   waitingRoomTitle: byId("waitingRoomTitle"),
   waitingRoomMeta: byId("waitingRoomMeta"),
@@ -801,6 +875,49 @@ function unlockBgmPlayback() {
   if (bgmUnlocked) return;
   bgmUnlocked = true;
   syncBgmWithScreen();
+}
+
+function consumePendingBgmAutoplay() {
+  const shouldAutoplay = sessionStorage.getItem(AUTO_UNLOCK_BGM_KEY) === "true";
+  if (shouldAutoplay) sessionStorage.removeItem(AUTO_UNLOCK_BGM_KEY);
+  return shouldAutoplay;
+}
+
+function tryAutoplayBgmAfterLogin() {
+  if (!consumePendingBgmAutoplay()) return;
+  unlockBgmPlayback();
+}
+
+function restoreBgmResumeState() {
+  const resumeState = takeBgmResumeState();
+  if (!resumeState) return;
+
+  const nextTrackName = audioModeForCurrentScreen();
+  if (resumeState.trackName !== nextTrackName) return;
+
+  const audio = bgmTracks[nextTrackName];
+  if (!audio) return;
+
+  let resumeTime = Number(resumeState.currentTime) || 0;
+  const savedAt = Number(resumeState.savedAt) || 0;
+  if (savedAt > 0) {
+    resumeTime += Math.max(0, (Date.now() - savedAt) / 1000);
+  }
+
+  const applyResumeTime = () => {
+    if (audio.duration && Number.isFinite(audio.duration)) {
+      resumeTime %= audio.duration;
+    }
+    audio.currentTime = Math.max(0, resumeTime);
+  };
+
+  if (audio.readyState >= 1) {
+    applyResumeTime();
+  } else {
+    audio.addEventListener("loadedmetadata", applyResumeTime, { once: true });
+  }
+
+  activeBgmName = nextTrackName;
 }
 
 function clamp(value, min, max) {
@@ -1018,16 +1135,6 @@ function renderRankingTable() {
   if (!els.rankingTableBody) return;
   updateRankingTabs();
 
-  const friendRankingLoading = rankingMode === "friends" && friendsLoading;
-  if (leaderboardLoading || friendRankingLoading) {
-    els.rankingTableBody.innerHTML = `
-      <tr>
-        <td colspan="4">Loading rankings...</td>
-      </tr>
-    `;
-    return;
-  }
-
   const currentUserRankingEntry = {
     id: mockCurrentUser.id,
     nickname: mockCurrentUser.nickname,
@@ -1045,6 +1152,18 @@ function renderRankingTable() {
       }))
     ]
     : leaderboardUsers;
+
+  const friendRankingLoading = rankingMode === "friends" && friendsLoading;
+  const showRankingLoading = rankingMode === "all" && leaderboardLoading && !leaderboardUsers.length;
+  const showFriendLoading = rankingMode === "friends" && friendRankingLoading && !rankingUsers.length;
+  if (showRankingLoading || showFriendLoading) {
+    els.rankingTableBody.innerHTML = `
+      <tr>
+        <td colspan="4">Loading rankings...</td>
+      </tr>
+    `;
+    return;
+  }
 
   if (!rankingUsers.length) {
     els.rankingTableBody.innerHTML = `
@@ -1085,8 +1204,9 @@ async function loadLeaderboardFromDb(force = false) {
   if (leaderboardLoadPromise) return leaderboardLoadPromise;
   if (leaderboardLoaded && !force) return leaderboardUsers;
 
+  const showLoadingRow = !leaderboardLoaded && !leaderboardUsers.length;
   leaderboardLoading = true;
-  renderRankingTable();
+  if (showLoadingRow) renderRankingTable();
   if (els.rankingStatus) els.rankingStatus.textContent = "Loading rankings...";
 
   leaderboardLoadPromise = import(LOGIN_MODULE_URL)
@@ -1207,13 +1327,16 @@ function renderFriendsTable() {
 function renderMailboxNotices() {
   // Paint the temporary mailbox notice list.
   if (!els.mailboxNoticeList) return;
-  if (mailboxLoading) {
+  const showEmptyState = !mockMailboxNotices.length;
+  els.mailboxNoticeList.classList.toggle("is-empty", showEmptyState);
+
+  if (mailboxLoading && !mailboxLoaded && !mockMailboxNotices.length) {
     els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">알림을 불러오는 중...</div>`;
     return;
   }
 
   if (!mockMailboxNotices.length) {
-    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">알림이 없습니다.</div>`;
+    els.mailboxNoticeList.innerHTML = `<div class="mailbox-notice-empty">새로운 알림이 없습니다.</div>`;
     return;
   }
 
@@ -1728,10 +1851,29 @@ function resultBoxesFor(values, labelPrefix) {
   }).join("");
 }
 
-function finalGuessText(guess) {
-  // Convert a final guess object into compact table text.
-  if (!guess) return "-";
-  return `R ${guess.r ?? 0} / G ${guess.g ?? 0} / B ${guess.b ?? 0}`;
+function resultFinalGuessBoxes(guess, labelPrefix) {
+  /*
+    Reuse the colored RGB boxes inside the result table.
+    If a player did not submit a final answer, show R/G/B letters instead of numbers.
+  */
+  return `
+    <div class="result-final-boxes" aria-label="${labelPrefix} final guess">
+      ${CHANNELS.map((channel) => {
+        const meta = CHANNEL_META[channel];
+        const hasValue = Number.isInteger(guess?.[channel]);
+        const value = hasValue ? guess[channel] : meta.label;
+        return `
+          <input
+            class="value-box ${meta.css}"
+            type="text"
+            value="${value}"
+            readonly
+            aria-label="${labelPrefix} ${meta.label} ${hasValue ? "value" : "not submitted"}"
+          />
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function resultTableRows() {
@@ -1751,7 +1893,12 @@ function resultTableRows() {
   //     </tr>
   //   `).join("");
   return [...(game.results || [])]
-    .sort((a, b) => (a.finalError ?? 0) - (b.finalError ?? 0))
+    .sort((a, b) => {
+      const aMissing = a.submittedFinalGuess === false;
+      const bMissing = b.submittedFinalGuess === false;
+      if (aMissing !== bMissing) return aMissing ? 1 : -1;
+      return (a.finalError ?? Number.MAX_SAFE_INTEGER) - (b.finalError ?? Number.MAX_SAFE_INTEGER);
+    })
     .map((result, index) => {
       // 대기실에서 받아두었던 game.players 배열에서 해당 유저의 프로필 사진을 찾습니다.
       const playerInfo = game.players.find(p => p.id === result.userId) || {};
@@ -1768,7 +1915,7 @@ function resultTableRows() {
         <td>${index + 1}</td>
         <td>${profileImageHtml("result-profile-image", profileImg)}</td>
         <td>${escapeHtml(result.nickname || "Player")}</td>
-        <td>${escapeHtml(finalGuessText(result.finalGuess))}</td>
+        <td class="result-final-guess-cell">${resultFinalGuessBoxes(result.finalGuess, result.nickname || "Player")}</td>
         <td style="color: ${earned > 0 ? '#31e981' : (earned < 0 ? '#ff4c64' : '#e9edff')}; font-weight: 950;">${displayRp} RP</td>
       </tr>
     `}).join("");
@@ -1790,12 +1937,12 @@ function renderResultModal() {
         ${resultBoxesFor(game.targetRgb, "Correct")}
       </div>
     </div>
-    <p class="result-total-error">My total error: ${game.score.totalError}</p>
+    <p class="result-total-error">My total error: ${game.score.totalError ?? "-"}</p>
     <div class="result-table-wrap">
       <table class="result-table">
         <thead>
           <tr>
-            <th>Index</th>
+            <th>Rank</th>
             <th>Profile</th>
             <th>Name</th>
             <th>Final Guess</th>
@@ -2035,6 +2182,18 @@ function closePrivateRoomCodeModal() {
   roomClient.pendingPrivateRoomCode = "";
 }
 
+function showLobbyAlert(message) {
+  if (!els.lobbyAlertLayer || !els.lobbyAlertMessage) return;
+  els.lobbyAlertMessage.textContent = String(message || "");
+  els.lobbyAlertLayer.hidden = false;
+  if (els.lobbyAlertConfirmButton) els.lobbyAlertConfirmButton.focus();
+}
+
+function closeLobbyAlert() {
+  if (!els.lobbyAlertLayer) return;
+  els.lobbyAlertLayer.hidden = true;
+}
+
 function submitPrivateRoomCode() {
   // Join the selected private room using the code typed into the popup.
   const privateCode = els.privateRoomCodeInput.value.trim();
@@ -2045,8 +2204,23 @@ function submitPrivateRoomCode() {
   }
 
   const roomCode = roomClient.pendingPrivateRoomCode;
-  closePrivateRoomCodeModal();
   joinRoom(roomCode, privateCode);
+}
+
+function validateRoomJoin(action) {
+  return new Promise((resolve) => {
+    if (!socket) {
+      resolve({ ok: false, message: "Open this page through the Node server to use rooms." });
+      return;
+    }
+
+    socket.emit("validate_join_room", {
+      roomCode: action.roomCode,
+      privateCode: action.privateCode
+    }, (response) => {
+      resolve(response || { ok: false, message: "Could not validate this room." });
+    });
+  });
 }
 
 function openAddFriendModal() {
@@ -2155,7 +2329,28 @@ function joinRoom(roomCode, privateCode = "") {
     nickname: roomClient.nickname
   };
 
-  if (!IS_GAME_PAGE || IS_LOBBY_PAGE) {
+  if (IS_LOBBY_PAGE) {
+    setLobbyStatus("Checking room...");
+    validateRoomJoin(action).then((response) => {
+      if (!response?.ok) {
+        const message = lobbyAlertMessageForError(response?.message);
+        setLobbyStatus(message);
+        showLobbyAlert(message);
+        if (privateCode) {
+          els.privateRoomCodeInput.focus();
+          els.privateRoomCodeInput.select?.();
+        }
+        return;
+      }
+
+      closePrivateRoomCodeModal();
+      setLobbyStatus("Opening room...");
+      goToGameWithAction(action);
+    });
+    return;
+  }
+
+  if (!IS_GAME_PAGE) {
     setLobbyStatus("Opening room...");
     goToGameWithAction(action);
     return;
@@ -2921,10 +3116,7 @@ function submitFinalAnswer(autoSubmit = false) {
     const input = document.getElementById(`final-${channel}`);
     const rawValue = input ? input.value.trim() : String(game.finalAnswer[channel]).trim();
     const value = Number(rawValue);
-    if (rawValue === "" || !Number.isInteger(value) || value < 0 || value > 255) {
-      if (!autoSubmit) els.finalStatus.textContent = "Enter final RGB numbers from 0 to 255.";
-      return;
-    }
+    if (rawValue === "" || !Number.isInteger(value) || value < 0 || value > 255) return;
     answer[channel] = value;
   }
 
@@ -2935,7 +3127,6 @@ function submitFinalAnswer(autoSubmit = false) {
     roomCode: roomClient.roomCode,
     guessRGB: answer
   });
-  els.finalStatus.textContent = "다른 플레이어의 입력을 기다리는 중...";
   els.submitFinalButton.disabled = true;
 }
 
@@ -3115,7 +3306,6 @@ function handleFinalGuessStart(data) {
   game.targetColors = data.colors || game.targetColors;
   game.finalAnswer = { r: "", g: "", b: "" };
   game.finalSubmitted = false;
-  els.finalStatus.textContent = "";
   els.submitFinalButton.disabled = true;
   resetFinalInputs();
   render();
@@ -3138,7 +3328,7 @@ function handleGameOver(data) {
   const myResult = game.results.find((result) => result.userId === game.localPlayerId);
   game.finalAnswer = myResult?.finalGuess || game.finalAnswer;
   game.score = {
-    totalError: myResult?.finalError ?? 0,
+    totalError: myResult?.submittedFinalGuess === false ? null : (myResult?.finalError ?? null),
     points: myResult?.earnedPoint ?? 0
   };
 
@@ -3180,6 +3370,9 @@ if (els.cancelCreateRoomButton) {
 els.createRoomButton.addEventListener("click", createRoomFromLobby);
 els.closePrivateRoomCodeButton.addEventListener("click", closePrivateRoomCodeModal);
 els.submitPrivateRoomCodeButton.addEventListener("click", submitPrivateRoomCode);
+if (els.lobbyAlertConfirmButton) {
+  els.lobbyAlertConfirmButton.addEventListener("click", closeLobbyAlert);
+}
 els.leaveRoomButton.addEventListener("click", leaveRoom);
 els.startGameButton.addEventListener("click", startGameFromLobby);
 els.leaderBoardsButton.addEventListener("click", showRankingPage);
@@ -3282,6 +3475,12 @@ if (els.privateRoomCodeInput) {
 if (els.privateRoomCodeLayer) {
   els.privateRoomCodeLayer.addEventListener("click", (event) => {
     if (event.target === els.privateRoomCodeLayer) closePrivateRoomCodeModal();
+  });
+}
+
+if (els.lobbyAlertLayer) {
+  els.lobbyAlertLayer.addEventListener("click", (event) => {
+    if (event.target === els.lobbyAlertLayer) closeLobbyAlert();
   });
 }
 
@@ -3403,6 +3602,8 @@ allVolumeButtons().forEach((button) => {
 document.addEventListener("pointerdown", unlockBgmPlayback, { once: true });
 document.addEventListener("keydown", unlockBgmPlayback, { once: true });
 setBgmVolume(bgmVolume);
+restoreBgmResumeState();
+tryAutoplayBgmAfterLogin();
 
 els.closeChoice.addEventListener("click", () => {
   // This only hides the modal locally. The server still owns the actual phase timing.
@@ -3420,7 +3621,6 @@ document.querySelectorAll("[data-final-channel]").forEach((input) => {
     event.target.value = value;
     event.target.closest(".value-entry")?.classList.toggle("has-value", value.length > 0);
     game.finalAnswer[channel] = value;
-    els.finalStatus.textContent = "";
     updateFinalSubmitButtonState();
   });
 });
@@ -3433,11 +3633,6 @@ els.submitFinalButton.addEventListener("click", () => {
 els.closeResult.addEventListener("click", () => {
   // After results are read, return this browser to the main lobby.
   resetToMainLobby();
-});
-
-els.exitButton.addEventListener("click", () => {
-  // Placeholder behavior: the visual button exists, but no navigation/reset is wired yet.
-  els.statusLine.textContent = "Exit action can be connected later.";
 });
 
 document.addEventListener("visibilitychange", () => {
@@ -3494,6 +3689,14 @@ if (PREVIEW_GAME_SCREEN) {
 
   socket.on("game_error", (data) => {
     const message = data?.message || "Something went wrong.";
+    if (PAGE_KIND === "game" && !roomClient.joined) {
+      if (message === "Incorrect room code.") {
+        savePrivateRoomRetry(roomClient.roomCode);
+      }
+      saveLobbyAlert(lobbyAlertMessageForError(message));
+      goToLobby();
+      return;
+    }
     if (isLobbyPhase()) setLobbyStatus(message);
     else els.statusLine.textContent = message;
   });
@@ -3511,7 +3714,6 @@ if (PREVIEW_GAME_SCREEN) {
   socket.on("final_guess_start", handleFinalGuessStart);
   socket.on("final_guess_received", () => {
     // Confirmation that the server received this player's final answer.
-    els.finalStatus.textContent = "다른 플레이어의 입력을 기다리는 중...";
   });
   socket.on("game_over", handleGameOver);
 } else {
@@ -3521,6 +3723,8 @@ if (PREVIEW_GAME_SCREEN) {
 // Initial paint. Without this call, the page would keep only the raw HTML defaults.
 render();
 restoreLobbyStatus();
+restorePrivateRoomRetry();
+restoreLobbyAlert();
 if (currentUserFromSession) {
   startPresenceTracking();
   loadMailboxNoticesFromDb(false);

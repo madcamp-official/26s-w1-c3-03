@@ -733,13 +733,17 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
   background: rgba(255,255,255,0.045);
 }
 
+.mailbox-notice-list.is-empty {
+  align-content: center;
+}
+
 /* 메일이 없을 때 표시되는 빈 상태 문구다. */
 .mailbox-notice-empty {
   min-height: 180px;
   display: grid;
   place-items: center;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
   text-align: center;
 }
@@ -1099,6 +1103,7 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
 /* 여러 팝업의 어두운 전체 화면 오버레이 공통 스타일이다. */
 .create-room-layer,
 .private-room-code-layer,
+.lobby-alert-layer,
 .add-friend-layer,
 .mailbox-layer,
 .user-info-layer,
@@ -1200,6 +1205,32 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
   width: 100%;
 }
 
+.lobby-alert-panel {
+  width: min(420px, 100%);
+  padding: 24px 24px 22px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 18px;
+  background: rgba(18, 22, 44, 0.96);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.09);
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+}
+
+.lobby-alert-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 800;
+  text-align: center;
+}
+
+.lobby-alert-button {
+  width: 100%;
+  margin: 0;
+}
+
 /* 친구 추가 팝업 박스다. */
 .add-friend-panel {
   position: relative;
@@ -1272,6 +1303,14 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
 .private-room-code-close-button {
   top: 14px;
   right: 14px;
+}
+
+.private-room-code-close-button .popup-close-icon,
+.private-room-code-close-button .user-info-close-icon {
+  width: 25px;
+  height: 25px;
+  display: block;
+  object-fit: contain;
 }
 
 .user-info-title {

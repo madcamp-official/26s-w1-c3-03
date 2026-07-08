@@ -17,6 +17,51 @@ import {
   const GAME_PAGE_URL = window.location.protocol === "file:"
     ? "lobby.html"
     : "/lobby.html";
+  const AUTO_UNLOCK_BGM_KEY = "colorMasterAutoplayBgm";
+
+  function goToLobbyAfterLogin() {
+    sessionStorage.setItem(AUTO_UNLOCK_BGM_KEY, "true");
+    window.location.href = GAME_PAGE_URL;
+  }
+
+  const nativeAlert = window.alert.bind(window);
+  const authModalLayer = document.getElementById('authModalLayer');
+  const authModalMessage = document.getElementById('authModalMessage');
+  const authModalConfirm = document.getElementById('authModalConfirm');
+
+  function closeAuthModal() {
+    if (!authModalLayer) return;
+    authModalLayer.classList.add('hidden');
+    authModalLayer.setAttribute('aria-hidden', 'true');
+  }
+
+  function showAuthModal(message) {
+    if (!authModalLayer || !authModalMessage) {
+      nativeAlert(message);
+      return;
+    }
+    authModalMessage.textContent = String(message ?? "");
+    authModalLayer.classList.remove('hidden');
+    authModalLayer.setAttribute('aria-hidden', 'false');
+    authModalConfirm?.focus();
+  }
+
+  window.alert = showAuthModal;
+
+  [authModalConfirm].forEach((button) => {
+    if (!button) return;
+    button.addEventListener('click', closeAuthModal);
+  });
+
+  document.querySelectorAll('[data-auth-modal-close]').forEach((element) => {
+    element.addEventListener('click', closeAuthModal);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (authModalLayer?.classList.contains('hidden')) return;
+    closeAuthModal();
+  });
 
   // ---------------------------------------------------
   // 화면 내부 전환 (SPA 방식)
@@ -26,13 +71,104 @@ import {
     document.getElementById(sectionId).classList.remove('hidden');
   };
 
-  document.getElementById('nav-to-login').addEventListener('click', () => showSection('login-section'));
-  document.getElementById('nav-to-guest').addEventListener('click', () => showSection('guest-login-section'));
-  document.getElementById('nav-to-signup').addEventListener('click', () => showSection('before-signup-section'));
-  document.getElementById('nav-to-email-signup').addEventListener('click', () => showSection('signup-section'));
+  function resetTextInput(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.value = "";
+    setBorderColor(input, "var(--line)");
+  }
+
+  function clearStatus(statusId) {
+    const status = document.getElementById(statusId);
+    if (!status) return;
+    status.innerText = "";
+    status.style.color = "";
+  }
+
+  function resetProfilePreview(imageId, fileInputId) {
+    const image = document.getElementById(imageId);
+    const fileInput = document.getElementById(fileInputId);
+    if (fileInput) fileInput.value = "";
+    if (!image) return;
+    image.src = "/Images/profile.png";
+    image.classList.add('default-img');
+  }
+
+  function resetLoginSection() {
+    resetTextInput('login-id');
+    resetTextInput('login-password');
+  }
+
+  function resetGuestLoginSection() {
+    resetTextInput('guest-nickname');
+    clearStatus('guest-nickname-status');
+    isGuestNicknameValid = false;
+    guestBtnCheckNickname.disabled = true;
+    guestLoginBtn.disabled = true;
+  }
+
+  function resetSignupSection() {
+    resetTextInput('signup-email');
+    resetTextInput('signup-nickname');
+    resetTextInput('signup-id');
+    resetTextInput('signup-password');
+    clearStatus('nickname-status');
+    clearStatus('id-status');
+    resetProfilePreview('defaultProfileImage', 'signup-profile-file');
+    isIdValid = false;
+    isNicknameValid = false;
+    isEmailValid = false;
+    isPasswordValid = false;
+    btnCheckId.disabled = true;
+    btnCheckNickname.disabled = true;
+    btnSignup.disabled = true;
+  }
+
+  function resetGoogleSignupSection() {
+    resetTextInput('g-signup-email');
+    resetTextInput('g-signup-nickname');
+    resetTextInput('g-signup-id');
+    clearStatus('g-nickname-status');
+    clearStatus('g-id-status');
+    resetProfilePreview('g-defaultProfileImage', 'g-signup-profile-file');
+    isGoogleIdValid = false;
+    isGoogleNicknameValid = false;
+    googleBtnCheckId.disabled = true;
+    googleBtnCheckNickname.disabled = true;
+    googleBtnSignup.disabled = true;
+    tempGoogleData = null;
+  }
+
+  function resetAuthFlowForms() {
+    resetLoginSection();
+    resetGuestLoginSection();
+    resetSignupSection();
+    resetGoogleSignupSection();
+  }
+
+  document.getElementById('nav-to-login').addEventListener('click', () => {
+    resetLoginSection();
+    showSection('login-section');
+  });
+  document.getElementById('nav-to-guest').addEventListener('click', () => {
+    resetGuestLoginSection();
+    showSection('guest-login-section');
+  });
+  document.getElementById('nav-to-signup').addEventListener('click', () => {
+    resetSignupSection();
+    resetGoogleSignupSection();
+    showSection('before-signup-section');
+  });
+  document.getElementById('nav-to-email-signup').addEventListener('click', () => {
+    resetSignupSection();
+    showSection('signup-section');
+  });
 
   document.querySelectorAll('.nav-to-main').forEach(btn => {
-    btn.addEventListener('click', () => showSection('main-section'));
+    btn.addEventListener('click', () => {
+      resetAuthFlowForms();
+      showSection('main-section');
+    });
   });
 
   // ---------------------------------------------------
@@ -118,7 +254,7 @@ import {
     const guestNick = document.getElementById('guest-nickname').value.trim().normalize('NFC');
 
     const isSuccess = await loginAsGuest(guestNick);
-    if (isSuccess) window.location.href = GAME_PAGE_URL;
+    if (isSuccess) goToLobbyAfterLogin();
   });
 
   // ---------------------------------------------------
@@ -134,7 +270,7 @@ import {
     else if (!pw){return alert("비밀번호를 입력하세요.");}
     
     const isSuccess = await login(user_id, pw);
-    if (isSuccess) window.location.href = GAME_PAGE_URL; // 로그인 성공 시 게임 로비로 이동
+    if (isSuccess) goToLobbyAfterLogin(); // 로그인 성공 시 게임 로비로 이동
   });
 
   // 2. 구글 로그인 및 추가 정보 기입
@@ -152,7 +288,7 @@ import {
 
       showSection('google-signup-section'); // 신규 유저는 추가 정보 창으로
     } else if (result && !result.isNewUser) {
-      window.location.href = GAME_PAGE_URL; // 기존 유저는 바로 게임 로비로 이동
+      goToLobbyAfterLogin(); // 기존 유저는 바로 게임 로비로 이동
     }
   });
 
@@ -170,7 +306,7 @@ import {
 
       showSection('google-signup-section'); // 신규 유저는 추가 정보 창으로
     } else if (result && !result.isNewUser) {
-      window.location.href = GAME_PAGE_URL; // 기존 유저는 바로 게임 로비로 이동
+      goToLobbyAfterLogin(); // 기존 유저는 바로 게임 로비로 이동
     }
   });
 
@@ -557,4 +693,3 @@ import {
       guestLoginBtn.click();
     }
   });
-

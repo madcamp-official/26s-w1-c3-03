@@ -11,7 +11,7 @@
   <main class="container">
     <div id="main-section">
       <div class="main-title-box">
-         <img class="main-logo" id="mainLogo" src="/Images/logo.png" alt="로고"/>
+        <img class="main-logo" id="mainLogo" src="/Images/logo.png" alt="로고" />
       </div>
       <div class="main-btn-group">
         <button id="nav-to-login" type="button">로그인</button>
@@ -42,7 +42,7 @@
       <div class="input-group secondary">
         <label for="guest-nickname">닉네임</label>
         <div class="input-with-btn">
-          <input type="text" id="guest-nickname" placeholder="2~12자 (한글, 영문, 숫자 사용 가능)" spellcheck="false">
+          <input type="text" id="guest-nickname" placeholder="2~12자(한글, 영문, 숫자 사용 가능)" spellcheck="false">
           <button class="btn-secondary" id="btn-guest-check-nickname" type="button">중복 확인</button>
         </div>
         <span id="guest-nickname-status" class="auth-status"></span>
@@ -78,7 +78,7 @@
       <div class="input-group secondary">
         <label for="signup-nickname">닉네임</label>
         <div class="input-with-btn">
-          <input type="text" id="signup-nickname" placeholder="2~12자 (한글, 영문, 숫자 사용 가능)" spellcheck="false">
+          <input type="text" id="signup-nickname" placeholder="2~12자(한글, 영문, 숫자 사용 가능)" spellcheck="false">
           <button class="btn-secondary" id="btn-check-nickname" type="button">중복 확인</button>
         </div>
         <span id="nickname-status" class="auth-status"></span>
@@ -90,10 +90,10 @@
           <button class="btn-secondary" id="btn-check-id" type="button">중복 확인</button>
         </div>
         <span id="id-status" class="auth-status"></span>
-      </div>      
+      </div>
       <div class="input-group">
         <label for="signup-password">비밀번호</label>
-        <input type="password" id="signup-password" placeholder="8~12자 (영문, 숫자, 특수문자 포함)">
+        <input type="password" id="signup-password" placeholder="8~12자(영문, 숫자, 특수문자 포함)">
       </div>
       <div class="login-btn-group">
         <button id="btn-signup" class="primary-btn" type="button">회원가입 완료</button>
@@ -115,7 +115,7 @@
       <div class="input-group secondary">
         <label for="g-signup-nickname">닉네임</label>
         <div class="input-with-btn">
-          <input type="text" id="g-signup-nickname" placeholder="2~12자 (한글, 영문, 숫자 사용 가능)" spellcheck="false">
+          <input type="text" id="g-signup-nickname" placeholder="2~12자(한글, 영문, 숫자 사용 가능)" spellcheck="false">
           <button class="btn-secondary" id="btn-g-check-nickname" type="button">중복 확인</button>
         </div>
         <span id="g-nickname-status" class="auth-status"></span>
@@ -127,9 +127,17 @@
           <button class="btn-secondary" id="btn-g-check-id" type="button">중복 확인</button>
         </div>
         <span id="g-id-status" class="auth-status"></span>
-      </div>      
-      <button id="btn-g-signup-complete" class="primary-btn" type="button">구글 가입 완료</button>
+      </div>
+      <button id="btn-g-signup-complete" class="primary-btn" type="button">Google 가입 완료</button>
       <span class="toggle-link nav-to-main">메인으로 돌아가기</span>
+    </div>
+
+    <div class="auth-modal-layer hidden" id="authModalLayer" aria-hidden="true">
+      <div class="auth-modal-backdrop" data-auth-modal-close></div>
+      <div class="auth-modal" role="dialog" aria-modal="true" aria-label="Authentication notice">
+        <p class="auth-modal-message" id="authModalMessage"></p>
+        <button class="primary-btn auth-modal-button" id="authModalConfirm" type="button">확인</button>
+      </div>
     </div>
   </main>
 
