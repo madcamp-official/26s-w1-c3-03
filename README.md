@@ -65,7 +65,7 @@
 
 > 필요한 테이블, 주요 필드, 데이터 타입, 테이블 간 관계를 정리
 
-<img width="1472" height="706" alt="Image" src="https://github.com/user-attachments/assets/edb6cbd0-97a5-4637-b574-7f8435262cc9" />
+<img width="2464" height="1568" alt="Image" src="https://github.com/user-attachments/assets/c3fa37a8-25d1-46a5-9e69-1cba27c806c4" />
 
 ---
 
