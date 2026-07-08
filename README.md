@@ -100,28 +100,17 @@
 
 > API 주소, 요청 방식, 요청값, 응답값, 에러 상황을 정리
 
+### 1. REST API 명세서
+
 클라이언트와 서버 간의 파일 업로드, 조회 및 계정 관리를 위한 HTTP 요청 기반 API
 
-- **기본 Content-Type:** `application/json` (파일 업로드 시 `multipart/form-data`)
+**기본 Content-Type:** `application/json` (파일 업로드 시 `multipart/form-data`)
 
 | **Method** | **Endpoint** | **설명** | **요청** | **응답** |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/guest-logout` | 게스트 계정 및 연관 데이터 전체 삭제 | **[Body]**
-`userId` (String, 필수) | **[200 OK]**
-`{ "deleted": true }`
-**[500 Error]**
-`{ "error": "Guest logout cleanup failed." }` |
-| `POST` | `/api/profile-image` | Firebase Storage 이미지 업로드 및 DB 갱신 | **[Form-Data]**
-`userId` (String, 필수)
-`profileImage` (File, 필수) | **[200 OK]**
-`{ "profileImage": "/api/..." }`
-**[400 Error]**
-`{ "error": "Missing userId" }` |
-| `GET` | `/api/profile-image-file` | 보안을 위해 서버를 거쳐 이미지를 프록시 로드 | **[Query]**
-`path` (String, 필수) | **[200 OK]**
-이미지 바이너리 스트림
-**[404 Error]**
-Profile image not found. |
+| `POST` | `/api/guest-logout` | 게스트 계정 및 연관 데이터 전체 삭제 | **[Body]** `userId` (String, 필수) | **[200 OK]** `{ "deleted": true }` **[500 Error]** `{ "error": "Guest logout cleanup failed." }` |
+| `POST` | `/api/profile-image` | Firebase Storage 이미지 업로드 및 DB 갱신 | **[Form-Data]** `userId` (String, 필수) `profileImage` (File, 필수) | **[200 OK]** `{ "profileImage": "/api/..." }` **[400 Error]** `{ "error": "Missing userId" }` |
+| `GET` | `/api/profile-image-file` | 보안을 위해 서버를 거쳐 이미지를 프록시 로드 | **[Query]** `path` (String, 필수) | **[200 OK]** 이미지 바이너리 스트림 **[404 Error]** Profile image not found. |
 
 ### 2. Socket.IO 이벤트 명세서
 
@@ -135,7 +124,7 @@ Profile image not found. |
 
 | **Method** | **Endpoint (이벤트)** | **설명** | **요청 (Payload)** | **응답 (기대 수신 이벤트)** |
 | --- | --- | --- | --- | --- |
-| `EMIT` | `request_room_list` | 메인 로비에 표시할 대기 중인 방 목록 요청 | (없음) | `room_list` |
+| `EMIT` | `request_room_list` | 메인 로비에 표시할 대기 중인 방 목록 요청 | - | `room_list` |
 | `EMIT` | `validate_join_room` | 방 입장 전 비밀번호 및 정원 검사 | `{ roomCode, privateCode }` | 방 참가 검증 결과 |
 | `EMIT` | `create_room` | 조건에 맞춰 새 게임 방을 생성 (호스트 자동 입장) | `{ roomName, joinCode, level, maxPlayers, userId, nickname, point, profileImage }` | `room_update` |
 | `EMIT` | `join_room` | 선택한 코드로 기존 방에 참가 | `{ roomCode, privateCode, userId, nickname, point, profileImage }` | `room_update` |
@@ -150,13 +139,13 @@ Profile image not found. |
 
 | **Method** | **Endpoint (이벤트)** | **설명** | **요청 (서버 발신 Payload)** | **응답** |
 | --- | --- | --- | --- | --- |
-| `ON` | `room_list` | 대기 중인 전체 방 목록 동기화 정보 수신 | `{ rooms: [방 정보 배열] }` | (없음) |
-| `ON` | `room_update` | 특정 방의 상태 변화 및 접속자 리스트 갱신 수신 | `{ roomCode, roomName, isPrivate, level, maxPlayers, phase, players, hostUserId }` | (없음) |
-| `ON` | `game_error` | 서버에서 발생한 예외/에러 메시지 수신 | `{ message: "에러 사유" }` | (없음) |
-| `ON` | `round_start` | 새 라운드 시작 알림 및 타겟 목표 색상 정보 수신 | `{ round, totalRounds, colors, players }` | (없음) |
-| `ON` | `turn_start` | 특정 플레이어의 예측 턴 시작 알림 및 남은 시간 수신 | `{ round, turnUserId, turnNickname, turnIndex, timeLimit, players }` | (없음) |
-| `ON` | `my_guess_result` | 본인이 제출한 색상에 대한 오차 및 피드백 결과 수신 | `{ guessRGB, feedback, errors }` | (없음) |
-| `ON` | `game_over` | 지정된 모든 라운드 종료, 정답 색상 및 최종 순위 수신 | `{ targetRgb, results: [최종 점수/순위 배열] }` | (없음) |
+| `ON` | `room_list` | 대기 중인 전체 방 목록 동기화 정보 수신 | `{ rooms: [방 정보 배열] }` | - |
+| `ON` | `room_update` | 특정 방의 상태 변화 및 접속자 리스트 갱신 수신 | `{ roomCode, roomName, isPrivate, level, maxPlayers, phase, players, hostUserId }` | - |
+| `ON` | `game_error` | 서버에서 발생한 예외/에러 메시지 수신 | `{ message: "에러 사유" }` | - |
+| `ON` | `round_start` | 새 라운드 시작 알림 및 타겟 목표 색상 정보 수신 | `{ round, totalRounds, colors, players }` | - |
+| `ON` | `turn_start` | 특정 플레이어의 예측 턴 시작 알림 및 남은 시간 수신 | `{ round, turnUserId, turnNickname, turnIndex, timeLimit, players }` | - |
+| `ON` | `my_guess_result` | 본인이 제출한 색상에 대한 오차 및 피드백 결과 수신 | `{ guessRGB, feedback, errors }` | - |
+| `ON` | `game_over` | 지정된 모든 라운드 종료, 정답 색상 및 최종 순위 수신 | `{ targetRgb, results: [최종 점수/순위 배열] }` | - |
 
 ---
 
