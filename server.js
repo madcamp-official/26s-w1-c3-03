@@ -36,6 +36,7 @@ const { initializeApp, cert } = require("firebase-admin/app");
 // const { getFirestore } = require("firebase-admin/firestore");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
+const { getAuth } = require("firebase-admin/auth");
 
 // multer parses multipart/form-data file uploads from the browser.
 const multer = require("multer");
@@ -52,12 +53,16 @@ const server = http.createServer(app);
 // io is the Socket.IO server. Use it to listen for connections and emit events.
 const io = new Server(server);
 
+app.use(express.json({ limit: "32kb" }));
+app.use(express.text({ type: "text/plain", limit: "32kb" }));
+
 const FIREBASE_STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || "colormaster-madcamp.firebasestorage.app";
 const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
   || path.join(__dirname, "secrets", "firebase-service-account.json");
 
 let adminDb = null;
 let adminBucket = null;
+let adminAuth = null;
 
 function initializeFirebaseAdmin() {
   /*
@@ -78,6 +83,7 @@ function initializeFirebaseAdmin() {
 
   adminDb = getFirestore(firebaseApp);
   adminBucket = getStorage(firebaseApp).bucket();
+  adminAuth = getAuth(firebaseApp);
 }
 
 initializeFirebaseAdmin();
@@ -102,6 +108,43 @@ function cleanProfileImagePath(rawPath) {
   const filePath = String(rawPath || "").trim();
   if (!filePath.startsWith("profile_images/") || filePath.includes("..")) return "";
   return filePath;
+}
+
+async function deleteUserSubcollectionAdmin(userId, subcollectionName) {
+  const snapshot = await adminDb.collection("User").doc(userId).collection(subcollectionName).get();
+  await Promise.all(snapshot.docs.map((itemDoc) => itemDoc.ref.delete()));
+}
+
+async function deleteGuestAccountAdmin(userId) {
+  const cleanUserId = String(userId || "").trim();
+  if (!cleanUserId || !adminDb) return false;
+
+  const userDocRef = adminDb.collection("User").doc(cleanUserId);
+  const userDoc = await userDocRef.get();
+  if (!userDoc.exists) return false;
+
+  const userData = userDoc.data() || {};
+  if (!userData.isGuest) return false;
+
+  const friendsSnapshot = await userDocRef.collection("Friends").get();
+  await Promise.all(friendsSnapshot.docs.map((friendDoc) => {
+    const friendData = friendDoc.data() || {};
+    const friendUserId = friendData.fd_id || friendData.userId || friendDoc.id;
+    return adminDb.collection("User").doc(friendUserId).collection("Friends").doc(cleanUserId).delete();
+  }));
+
+  await Promise.all([
+    deleteUserSubcollectionAdmin(cleanUserId, "Friends"),
+    deleteUserSubcollectionAdmin(cleanUserId, "Mailbox")
+  ]);
+
+  await userDocRef.delete();
+  if (adminAuth) {
+    await adminAuth.deleteUser(cleanUserId).catch((error) => {
+      if (error?.code !== "auth/user-not-found") throw error;
+    });
+  }
+  return true;
 }
 
 /*
@@ -157,6 +200,7 @@ const activeRooms = new Map();
 */
 const PUBLIC_DIR = path.join(__dirname, "Public");
 const IMAGE_DIR = path.join(__dirname, "Images");
+const BGM_DIR = path.join(__dirname, "BGM");
 const AUTH_HTML = path.join(PUBLIC_DIR, "auth.html");
 const LOBBY_HTML = path.join(PUBLIC_DIR, "lobby.html");
 const GAME_HTML = path.join(PUBLIC_DIR, "game.html");
@@ -192,6 +236,31 @@ app.get("/lobby.css", (_req, res) => {
 
 app.get("/game.css", (_req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "game.css"));
+});
+
+app.post("/api/guest-logout", async (req, res) => {
+  try {
+    if (!adminDb) {
+      return res.status(503).json({ error: "Firebase Admin is not configured on the server." });
+    }
+
+    let body = {};
+    if (typeof req.body === "string") {
+      try {
+        body = JSON.parse(req.body || "{}");
+      } catch (_error) {
+        body = {};
+      }
+    } else {
+      body = req.body || {};
+    }
+
+    const deleted = await deleteGuestAccountAdmin(body.userId || req.query.userId);
+    res.json({ deleted });
+  } catch (error) {
+    console.error("Guest logout cleanup failed:", error);
+    res.status(500).json({ error: "Guest logout cleanup failed." });
+  }
 });
 
 app.post("/api/profile-image", upload.single("profileImage"), async (req, res) => {
@@ -294,6 +363,7 @@ app.get("/api/profile-image-file", async (req, res) => {
 
 app.use(express.static(PUBLIC_DIR));
 app.use("/Images", express.static(IMAGE_DIR));
+app.use("/BGM", express.static(BGM_DIR));
 
 function clamp(value, min, max) {
   // Restrict a number so it cannot go below min or above max.
@@ -394,6 +464,44 @@ function errorsFor(target, guess) {
   };
 }
 
+function createBoundaries() {
+  return {
+    r: { low: 0, high: 255 },
+    g: { low: 0, high: 255 },
+    b: { low: 0, high: 255 }
+  };
+}
+
+function midpointGuess(boundaries = createBoundaries()) {
+  return {
+    r: Math.round((boundaries.r.low + boundaries.r.high) / 2),
+    g: Math.round((boundaries.g.low + boundaries.g.high) / 2),
+    b: Math.round((boundaries.b.low + boundaries.b.high) / 2)
+  };
+}
+
+function tightenPlayerBoundaries(player, guess, feedback, channels = ["r", "g", "b"]) {
+  if (!player.boundaries) player.boundaries = createBoundaries();
+  const errorLimitByTier = {
+    blue: 0,
+    green: 10,
+    yellow: 50,
+    orange: 150,
+    red: 255
+  };
+
+  channels.forEach((channel) => {
+    const value = Number(guess?.[channel]);
+    const tier = feedback?.[channel];
+    const errorLimit = errorLimitByTier[tier];
+    if (!Number.isInteger(value) || errorLimit === undefined) return;
+
+    const bounds = player.boundaries[channel];
+    bounds.low = Math.max(bounds.low, clamp(value - errorLimit, 0, 255));
+    bounds.high = Math.min(bounds.high, clamp(value + errorLimit, 0, 255));
+  });
+}
+
 function generateTarget(level) {
   /*
     Create the hidden target for the game.
@@ -445,7 +553,8 @@ function publicPlayers(room) {
     index,
     isHost: player.socketId === room.hostSocketId,
     hasPeeked: room.peekedUsers.has(player.userId),
-    isReady: player.isReady || false
+    isReady: player.isReady || false,
+    disconnected: Boolean(player.disconnected)
   }));
 }
 
@@ -534,6 +643,7 @@ function createRoom(roomCode, hostSocketId, options = {}) {
     currentTurnData: null,
     peekedUsers: new Set(),
     finalSubmissions: new Set(),
+    disconnectedUserIds: new Set(),
     timerRef: null
   };
 }
@@ -559,6 +669,8 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
     userId,
     nickname,
     isReady: false,
+    disconnected: false,
+    boundaries: createBoundaries(),
     finalGuess: null,
     finalErrorSum: null
   });
@@ -568,6 +680,8 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
 function resetPlayerRoundState(room) {
   // Clear final-guess result data before a new game starts.
   room.players.forEach((player) => {
+    player.disconnected = false;
+    player.boundaries = createBoundaries();
     player.finalGuess = null;
     player.finalErrorSum = null;
   });
@@ -618,6 +732,61 @@ function startRound(room) {
   startGuessingPhase(room);
 }
 
+function submitTurnGuessForPlayer(room, currentPlayer, cleanGuess, sourceSocket = null) {
+  clearRoomTimer(room);
+
+  const target = room.targetData.average;
+  const errors = errorsFor(target, cleanGuess);
+  const feedback = {
+    r: feedbackTier(target.r, cleanGuess.r),
+    g: feedbackTier(target.g, cleanGuess.g),
+    b: feedbackTier(target.b, cleanGuess.b)
+  };
+
+  tightenPlayerBoundaries(currentPlayer, cleanGuess, feedback);
+
+  room.currentTurnData = {
+    playerId: currentPlayer.userId,
+    guessRGB: cleanGuess,
+    feedback,
+    errors
+  };
+
+  if (sourceSocket) {
+    sourceSocket.emit("my_guess_result", {
+      guessRGB: cleanGuess,
+      feedback,
+      errors
+    });
+  }
+
+  startPeekingPhase(room);
+}
+
+function activePlayerCount(room) {
+  return room.players.filter((player) => !player.disconnected).length;
+}
+
+function autoPeekForDisconnectedPlayers(room) {
+  const guesser = room.players[room.turnIndex];
+  if (!guesser || !room.currentTurnData) return;
+
+  room.players.forEach((player) => {
+    if (!player.disconnected || player.userId === guesser.userId || room.peekedUsers.has(player.userId)) return;
+    const selectedColor = ["r", "g", "b"][Math.floor(Math.random() * 3)];
+    tightenPlayerBoundaries(
+      player,
+      room.currentTurnData.guessRGB,
+      room.currentTurnData.feedback,
+      [selectedColor]
+    );
+    room.peekedUsers.add(player.userId);
+    io.to(room.roomCode).emit("player_peeked", {
+      userId: player.userId
+    });
+  });
+}
+
 function startGuessingPhase(room) {
   /*
     Start the normal guessing phase for the player at room.turnIndex.
@@ -635,6 +804,11 @@ function startGuessingPhase(room) {
   if (!currentPlayer) {
     // If there is no current player, skip to the final guess phase.
     startFinalGuess(room);
+    return;
+  }
+
+  if (currentPlayer.disconnected) {
+    submitTurnGuessForPlayer(room, currentPlayer, midpointGuess(currentPlayer.boundaries));
     return;
   }
 
@@ -684,6 +858,12 @@ function startPeekingPhase(room) {
     timeLimit: CONFIG.PEEK_TIME_MS / 1000
   });
 
+  autoPeekForDisconnectedPlayers(room);
+  if (room.peekedUsers.size >= room.players.length - 1) {
+    room.timerRef = setTimeout(() => advanceTurn(room), 2000);
+    return;
+  }
+
   room.timerRef = setTimeout(() => {
     // If not everyone chooses in time, continue anyway.
     advanceTurn(room);
@@ -730,6 +910,15 @@ function startFinalGuess(room) {
   clearRoomTimer(room);
   room.phase = "FINAL_GUESS";
   room.finalSubmissions = new Set();
+  room.players.forEach((player) => {
+    if (!player.disconnected) return;
+    const cleanGuess = midpointGuess(player.boundaries);
+    const target = room.targetData.average;
+    const errors = errorsFor(target, cleanGuess);
+    player.finalGuess = cleanGuess;
+    player.finalErrorSum = errors.r + errors.g + errors.b;
+    room.finalSubmissions.add(player.userId);
+  });
   emitRoomUpdate(room);
 
   io.to(room.roomCode).emit("final_guess_start", {
@@ -741,6 +930,10 @@ function startFinalGuess(room) {
     // End the game even if some players never submit.
     endGame(room);
   }, CONFIG.FINAL_TIME_MS);
+
+  if (room.finalSubmissions.size >= room.players.length) {
+    endGame(room);
+  }
 }
 
 // 수정 필요함 
@@ -763,8 +956,10 @@ function endGame(room) {
     }
   });
 
-  // Sort a copy so room.players itself is not rearranged.
-  const sortedPlayers = [...room.players].sort((a, b) => a.finalErrorSum - b.finalErrorSum);
+  // Sort connected players only. Disconnected players are not included in final ranking.
+  const sortedPlayers = room.players
+    .filter((player) => !player.disconnected)
+    .sort((a, b) => a.finalErrorSum - b.finalErrorSum);
   const pointArray = CONFIG.POINTS[sortedPlayers.length] || [];
   const results = sortedPlayers.map((player, index) => ({
     userId: player.userId,
@@ -782,12 +977,11 @@ function endGame(room) {
 
   if (adminDb) {
     results.forEach((result) => {
-      // 비회원(preview)이 아닌 로그인한 정상 유저인 경우에만 저장
-      if (result.userId && !result.userId.startsWith("preview_")) {
-        adminDb.collection("User").doc(result.userId).update({
-          rankingPoint: FieldValue.increment(result.earnedPoint) // 기존 점수에 얻은 점수를 더함
-        }).catch(err => console.error("RP 업데이트 실패:", err));
-      }
+      if (!result.userId || result.userId.startsWith("preview_")) return;
+      adminDb.collection("User").doc(result.userId).update({
+        point: FieldValue.increment(result.earnedPoint),
+        rankingPoint: FieldValue.increment(result.earnedPoint)
+      }).catch((error) => console.error("RP update failed:", error));
     });
   }
 
@@ -803,6 +997,44 @@ function removeSocketFromRoom(socket, room, notifyLeavingSocket = false) {
   */
   const index = room.players.findIndex((player) => player.socketId === socket.id);
   if (index === -1) return false;
+
+  if (room.phase !== "WAITING") {
+    const player = room.players[index];
+    player.disconnected = true;
+    player.socketId = null;
+    room.disconnectedUserIds.add(player.userId);
+    socket.leave(room.roomCode);
+
+    if (activePlayerCount(room) === 0) {
+      clearRoomTimer(room);
+      activeRooms.delete(room.roomCode);
+      emitRoomList();
+      return true;
+    }
+
+    emitRoomUpdate(room);
+    if (room.phase === "GUESSING" && room.turnIndex === index) {
+      submitTurnGuessForPlayer(room, player, midpointGuess(player.boundaries));
+    } else if (room.phase === "PEEKING") {
+      autoPeekForDisconnectedPlayers(room);
+      if (room.peekedUsers.size >= room.players.length - 1) {
+        clearRoomTimer(room);
+        room.timerRef = setTimeout(() => advanceTurn(room), 2000);
+      }
+    } else if (room.phase === "FINAL_GUESS") {
+      const cleanGuess = midpointGuess(player.boundaries);
+      const target = room.targetData.average;
+      const errors = errorsFor(target, cleanGuess);
+      player.finalGuess = cleanGuess;
+      player.finalErrorSum = errors.r + errors.g + errors.b;
+      room.finalSubmissions.add(player.userId);
+      if (room.finalSubmissions.size >= room.players.length) {
+        endGame(room);
+      }
+    }
+
+    return true;
+  }
 
   const wasCurrentTurn = index === room.turnIndex;
   room.players.splice(index, 1);
@@ -970,6 +1202,10 @@ io.on("connection", (socket) => {
       sendError(socket, `Need at least ${CONFIG.MIN_PLAYERS_TO_START} player(s).`);
       return;
     }
+    if (!room.players.every((player) => player.isReady)) {
+      sendError(socket, "All players must be ready before starting.");
+      return;
+    }
 
     startGame(room, level || room.level);
   });
@@ -993,34 +1229,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // A valid guess ends the guessing timer immediately.
-    clearRoomTimer(room);
-
-    // Compare the submitted guess to the hidden average target.
-    const target = room.targetData.average;
-    const errors = errorsFor(target, cleanGuess);
-    const feedback = {
-      r: feedbackTier(target.r, cleanGuess.r),
-      g: feedbackTier(target.g, cleanGuess.g),
-      b: feedbackTier(target.b, cleanGuess.b)
-    };
-
-    room.currentTurnData = {
-      // Store this turn's guess so other players can peek one channel.
-      playerId: currentPlayer.userId,
-      guessRGB: cleanGuess,
-      feedback,
-      errors
-    };
-
-    // Only the guessing player receives full feedback for all channels.
-    socket.emit("my_guess_result", {
-      guessRGB: cleanGuess,
-      feedback,
-      errors
-    });
-
-    startPeekingPhase(room);
+    submitTurnGuessForPlayer(room, currentPlayer, cleanGuess, socket);
   });
 
   socket.on("peek_color", ({ roomCode, selectedColor }) => {
@@ -1040,6 +1249,13 @@ io.on("connection", (socket) => {
 
     const channel = String(selectedColor || "").toLowerCase();
     if (!["r", "g", "b"].includes(channel)) return;
+
+    tightenPlayerBoundaries(
+      peekingPlayer,
+      room.currentTurnData.guessRGB,
+      room.currentTurnData.feedback,
+      [channel]
+    );
 
     // Track by stable user id so the UI can show a check mark by player.
     room.peekedUsers.add(peekingPlayer.userId);
@@ -1075,7 +1291,7 @@ io.on("connection", (socket) => {
     if (!room || room.phase !== "FINAL_GUESS") return;
 
     const player = room.players.find((candidate) => candidate.socketId === socket.id);
-    if (!player || room.finalSubmissions.has(socket.id)) return;
+    if (!player || room.finalSubmissions.has(player.userId)) return;
 
     const cleanGuess = sanitizeRgb(guessRGB);
     if (!cleanGuess) {
@@ -1088,8 +1304,7 @@ io.on("connection", (socket) => {
     player.finalGuess = cleanGuess;
     player.finalErrorSum = errors.r + errors.g + errors.b;
 
-    // Track socket ids here because each currently connected browser submits once.
-    room.finalSubmissions.add(socket.id);
+    room.finalSubmissions.add(player.userId);
 
     // Confirm to this browser that the server accepted its final answer.
     socket.emit("final_guess_received");

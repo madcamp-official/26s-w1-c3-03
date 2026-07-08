@@ -268,6 +268,7 @@ function friendFromUserDoc(userId, userData = {}, fallbackData = {}) {
 
 function leaderboardUserFromDoc(userDoc) {
   const data = userDoc.data();
+  if (data.isGuest) return null;
   return {
     id: userDoc.id,
     nickname: data.nickname || data.user_id || "Player",
@@ -284,7 +285,9 @@ export async function getLeaderboardUsers(maxUsers = 50) {
     limit(safeLimit)
   );
   const leaderboardSnapshot = await getDocs(leaderboardQuery);
-  return leaderboardSnapshot.docs.map(leaderboardUserFromDoc);
+  return leaderboardSnapshot.docs
+    .map(leaderboardUserFromDoc)
+    .filter(Boolean);
 }
 
 export async function setUserPresence(userId, online) {
@@ -615,8 +618,33 @@ export async function checkNicknameDuplicate(nickname) {
 // ---------------------------------------------------
 // 8. 게스트 로그인 함수
 // ---------------------------------------------------
+async function cleanupCurrentAnonymousGuest() {
+  const currentUser = auth.currentUser;
+  if (!currentUser?.isAnonymous) return;
+
+  try {
+    await deleteGuestAccount(currentUser.uid);
+  } catch (error) {
+    console.warn("Could not clean previous anonymous guest locally:", error);
+    await fetch(`/api/guest-logout?userId=${encodeURIComponent(currentUser.uid)}`, {
+      method: "POST",
+      keepalive: true
+    }).catch(() => {});
+  }
+
+  if (auth.currentUser?.uid === currentUser.uid) {
+    try {
+      await deleteUser(auth.currentUser);
+    } catch (_error) {
+      await signOut(auth).catch(() => {});
+    }
+  }
+}
+
 export async function loginAsGuest(nickname) {
   try {
+    await cleanupCurrentAnonymousGuest();
+
     // 1. 닉네임 중복 확인 (기존에 만든 함수 재사용)
     const q = query(collection(db, "User"), where("nickname", "==", nickname));
     const querySnapshot = await getDocs(q);

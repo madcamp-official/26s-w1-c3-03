@@ -120,13 +120,13 @@
   background: transparent;
   transition: transform 160ms ease; */
   position: absolute;
-  top: -15px;    /* 위쪽 레이아웃 여백에 맞춰 미세 조정 가능 */
+  top: -8px;    /* 위쪽 레이아웃 여백에 맞춰 미세 조정 가능 */
   right: -17px;  /* 오른쪽 카드 여백에 맞춰 미세 조정 가능 */
   z-index: 12;
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 8px;
+  /* padding: 8px; */
   transition: transform 160ms ease;
 }
 
@@ -259,8 +259,8 @@
   border-radius: 8px;
   object-fit: cover;
   background: rgba(255,255,255,0.08); */
-  width: 44px;
-  height: 44px;
+  width: 50px;
+  height: 50px;
   display: inline-block; /* 텍스트와 동일한 라인에 배치하여 수직 정렬이 먹히게 함 */
   vertical-align: middle;
   margin: 0;
@@ -334,14 +334,18 @@
 }
 
 .waiting-ready-button.is-ready {
-  background: rgba(49, 233, 129, 0.12);
-  border-color: rgba(49, 233, 129, 0.42);
-  color: #bbf7d0;
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.14);
+  color: rgba(233, 237, 255, 0.62);
+  opacity: 0.72;
+  filter: grayscale(0.35);
+  box-shadow: none;
 }
 
 .waiting-ready-button.is-ready:hover {
-  background: rgba(49, 233, 129, 0.2);
-  border-color: rgba(49, 233, 129, 0.72);
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.18);
+  opacity: 0.82;
 }
 
 /* 하단 게임 시작 버튼 영역 */
@@ -358,7 +362,7 @@
   border-radius: 8px;
   background: #6d7cff;
   color: #ffffff;
-  font-size: 25px;
+  font-size: 20px;
   font-weight: 950;
   box-shadow: 0 10px 24px rgba(109, 124, 255, 0.24);
 }
@@ -448,12 +452,31 @@
   position: relative;
   width: min(560px, 100%);
   display: grid;
-  gap: 14px;
-  padding: 24px;
+  gap: 0;
+  padding: 20px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(15, 18, 40, 0.98);
   box-shadow: var(--shadow);
+}
+
+.invite-friend-header {
+  height: 29px;
+  display: grid;
+  grid-template-columns: 1fr 25px;
+  align-items: center;
+  column-gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.invite-friend-header .game-section-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.invite-friend-status {
+  display: none;
 }
 
 .invite-friend-close-button,
@@ -465,6 +488,10 @@
   place-items: center;
   border: 0;
   background: transparent;
+}
+
+.invite-friend-close-button {
+  justify-self: end;
 }
 
 .invite-friend-close-button:hover,
@@ -487,21 +514,39 @@
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
   background: rgba(255,255,255,0.045);
+  margin-top: 13px;
 }
 
 .invite-friend-table {
   width: 100%;
   min-width: 480px;
+  table-layout: fixed;
   border-collapse: collapse;
   color: #e9edff;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 800;
   text-align: center;
 }
 
+.invite-friend-col-index {
+  width: 70px;
+}
+
+.invite-friend-col-profile {
+  width: 100px;
+}
+
+.invite-friend-col-nickname {
+  width: auto;
+}
+
+.invite-friend-col-action {
+  width: 100px;
+}
+
 .invite-friend-table th,
 .invite-friend-table td {
-  padding: 12px 10px;
+  padding: 10px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.10);
   vertical-align: middle;
   text-align: center;
@@ -509,7 +554,7 @@
 
 .invite-friend-table th {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 950;
   text-transform: uppercase;
 }
@@ -519,8 +564,8 @@
 }
 
 .invite-friend-profile-image {
-  width: 38px;
-  height: 38px;
+  width: 45px;
+  height: 45px;
   display: block;
   margin: 0 auto;
   border: 1px solid rgba(255,255,255,0.22);
@@ -535,13 +580,21 @@
 }
 
 .invite-friend-button {
-  min-height: 36px;
-  padding: 8px 12px;
+  width: 64px;
+  min-height: 32px;
+  padding: 6px 10px;
   border-radius: 8px;
   background: #6d7cff;
   color: #ffffff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 900;
+}
+
+.invite-friend-button:disabled {
+  opacity: 0.42;
+  cursor: default;
+  filter: grayscale(0.45);
+  box-shadow: none;
 }
 
 .invite-friend-empty {

@@ -66,24 +66,28 @@
       <div class="invite-friend-layer" id="inviteFriendLayer" hidden>
         <div class="invite-friend-panel" role="dialog" aria-modal="true" aria-labelledby="inviteFriendTitle">
           <div class="invite-friend-header">
-            <div>
-              <h3 class="game-section-title" id="inviteFriendTitle">Invite Friend</h3>
-            </div>
+            <h3 class="game-section-title" id="inviteFriendTitle">친구 초대</h3>
             <button class="invite-friend-close-button" id="closeInviteFriendButton" type="button" aria-label="Close invite friend">
               <img class="invite-friend-close-icon" src="/Images/close_icon.png" alt="" />
             </button>
           </div>
 
-          <p class="game-status" id="inviteFriendStatus" aria-live="polite">Choose an online friend to invite.</p>
+          <p class="game-status invite-friend-status" id="inviteFriendStatus" aria-live="polite"></p>
 
           <div class="invite-friend-table-wrap">
             <table class="invite-friend-table">
+              <colgroup>
+                <col class="invite-friend-col-index" />
+                <col class="invite-friend-col-profile" />
+                <col class="invite-friend-col-nickname" />
+                <col class="invite-friend-col-action" />
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Index</th>
+                  <th>No.</th>
                   <th>Profile</th>
                   <th>Nickname</th>
-                  <th>Invite</th>
+                  <th>초대</th>
                 </tr>
               </thead>
               <tbody id="inviteFriendTableBody"></tbody>

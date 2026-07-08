@@ -80,6 +80,7 @@ const GAME_PAGE_URL = window.location.protocol === "file:" ? "game.html" : "/gam
 const LOGIN_MODULE_URL = window.location.protocol === "file:" ? "login.js" : "/login.js";
 const DEFAULT_PROFILE_IMAGE = "/Images/profile.png";
 const PENDING_ROOM_ACTION_KEY = "colorMasterPendingRoomAction";
+const INTERNAL_NAVIGATION_KEY = "colorMasterInternalNavigation";
 
 function normalizeProfileImage(profileImage) {
   /*
@@ -164,6 +165,39 @@ function clearLoginSession() {
   ].forEach((key) => sessionStorage.removeItem(key));
 }
 
+function markInternalNavigation() {
+  sessionStorage.setItem(INTERNAL_NAVIGATION_KEY, "true");
+}
+
+let internalNavigationConsumed = false;
+let guestLogoutBeaconSent = false;
+
+function consumeInternalNavigationFlag() {
+  if (internalNavigationConsumed) return true;
+  const isInternal = sessionStorage.getItem(INTERNAL_NAVIGATION_KEY) === "true";
+  sessionStorage.removeItem(INTERNAL_NAVIGATION_KEY);
+  if (isInternal) internalNavigationConsumed = true;
+  return isInternal;
+}
+
+function sendGuestLogoutBeacon() {
+  if (!isGuestUser() || !mockCurrentUser.id || guestLogoutBeaconSent) return;
+  guestLogoutBeaconSent = true;
+  const payload = JSON.stringify({ userId: mockCurrentUser.id });
+  const url = `/api/guest-logout?userId=${encodeURIComponent(mockCurrentUser.id)}`;
+  if (navigator.sendBeacon) {
+    const body = new Blob([payload], { type: "application/json" });
+    navigator.sendBeacon(url, body);
+    return;
+  }
+  fetch(url, {
+    method: "POST",
+    body: payload,
+    headers: { "Content-Type": "application/json" },
+    keepalive: true
+  }).catch(() => {});
+}
+
 async function updateCurrentUserPresence(online) {
   if (!currentUserFromSession || !mockCurrentUser?.id) return;
   try {
@@ -230,6 +264,33 @@ function isGuestUser() {
 
 document.body?.classList.toggle("is-guest-user", isGuestUser());
 
+const bgmTracks = typeof Audio === "function"
+  ? {
+      lobby: new Audio("/BGM/Platformer.wav"),
+      game: new Audio("/BGM/Pipiripi.mp3")
+    }
+  : {};
+
+function enableSoftLoop(audio, trimSeconds = 0.12) {
+  if (!audio) return;
+  audio.loop = false;
+  audio.addEventListener("timeupdate", () => {
+    if (!audio.duration || Number.isNaN(audio.duration)) return;
+    if (audio.currentTime < audio.duration - trimSeconds) return;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  });
+}
+
+Object.values(bgmTracks).forEach((audio) => {
+  audio.loop = true;
+  audio.preload = "auto";
+});
+enableSoftLoop(bgmTracks.lobby, 0.12);
+let activeBgmName = "";
+let bgmUnlocked = false;
+let bgmVolume = clamp(Number(localStorage.getItem("colorMasterVolume") ?? 70), 0, 100);
+
 function createMockProfileImage(nickname, hue) {
   /*
     Temporary profile image for screen development.
@@ -294,11 +355,13 @@ function takePendingRoomAction() {
 
 function goToGameWithAction(action) {
   savePendingRoomAction(action);
+  markInternalNavigation();
   window.location.href = GAME_PAGE_URL;
 }
 
 function goToLobby(message = "") {
   if (message) sessionStorage.setItem("colorMasterLobbyStatus", message);
+  markInternalNavigation();
   window.location.href = LOBBY_PAGE_URL;
 }
 
@@ -683,6 +746,62 @@ const els = {
   volumeSliderWrap: byId("volumeSliderWrap"),
   volumeSlider: byId("volumeSlider")
 };
+
+function allVolumeSliders() {
+  return [...document.querySelectorAll(".lobby-volume-slider, .waiting-volume-slider, .volume-slider")];
+}
+
+function allVolumeButtons() {
+  return [...document.querySelectorAll(".lobby-volume-button, .waiting-volume-button, .volume-button")];
+}
+
+function setBgmVolume(value) {
+  bgmVolume = clamp(Math.round(Number(value) || 0), 0, 100);
+  localStorage.setItem("colorMasterVolume", String(bgmVolume));
+  Object.values(bgmTracks).forEach((audio) => {
+    audio.volume = bgmVolume / 100;
+    audio.muted = bgmVolume === 0;
+  });
+  allVolumeSliders().forEach((slider) => {
+    slider.value = String(bgmVolume);
+  });
+  allVolumeButtons().forEach((button) => {
+    button.classList.toggle("is-muted", bgmVolume === 0);
+  });
+}
+
+function audioModeForCurrentScreen() {
+  return isLobbyPhase() ? "lobby" : "game";
+}
+
+function syncBgmWithScreen() {
+  if (!bgmTracks.lobby || !bgmTracks.game) return;
+  const nextBgmName = audioModeForCurrentScreen();
+  if (nextBgmName === activeBgmName) {
+    if (bgmUnlocked && bgmTracks[nextBgmName].paused) {
+      bgmTracks[nextBgmName].play().catch(() => {
+        bgmUnlocked = false;
+      });
+    }
+    return;
+  }
+
+  Object.entries(bgmTracks).forEach(([name, audio]) => {
+    if (name !== nextBgmName) audio.pause();
+  });
+  activeBgmName = nextBgmName;
+  if (!bgmUnlocked) return;
+
+  bgmTracks[nextBgmName].play().catch(() => {
+    bgmUnlocked = false;
+  });
+}
+
+function unlockBgmPlayback() {
+  if (bgmUnlocked) return;
+  bgmUnlocked = true;
+  syncBgmWithScreen();
+}
 
 function clamp(value, min, max) {
   // Restrict value so it never goes below min or above max.
@@ -1129,7 +1248,7 @@ function renderInviteFriendList() {
   if (!onlineFriends.length) {
     els.inviteFriendTableBody.innerHTML = `
       <tr>
-        <td class="invite-friend-empty" colspan="4">No online friends.</td>
+        <td class="invite-friend-empty" colspan="4">온라인 친구가 없습니다.</td>
       </tr>
     `;
     return;
@@ -1140,7 +1259,7 @@ function renderInviteFriendList() {
       <td>${index + 1}</td>
       <td>${profileImageHtml("invite-friend-profile-image", friend.profileImage)}</td>
       <td>${escapeHtml(friend.nickname)}</td>
-      <td><button class="invite-friend-button" type="button" data-send-game-invite="${escapeHtml(friend.id)}">Invite</button></td>
+      <td><button class="invite-friend-button" type="button" data-send-game-invite="${escapeHtml(friend.id)}">초대</button></td>
     </tr>
   `).join("");
 
@@ -1155,7 +1274,7 @@ function openInviteFriendModal() {
   loadFriendsFromDb(true);
   renderInviteFriendList();
   els.inviteFriendLayer.hidden = false;
-  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "Choose an online friend to invite.";
+  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "";
 }
 
 function closeInviteFriendModal() {
@@ -1174,12 +1293,14 @@ async function sendGameInvite(friendId) {
 
   const button = [...document.querySelectorAll("[data-send-game-invite]")]
     .find((candidate) => candidate.dataset.sendGameInvite === friendId);
-  const previousButtonText = button?.textContent || "Invite";
+  if (button?.disabled) return;
+
+  const previousButtonText = button?.textContent || "초대";
   if (button) {
     button.disabled = true;
-    button.textContent = "Sending...";
+    button.textContent = "보냄";
   }
-  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = `Sending invite to ${friend.nickname}...`;
+  if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "";
 
   try {
     const { sendGameInvite: sendGameInviteToDb } = await import(LOGIN_MODULE_URL);
@@ -1192,14 +1313,14 @@ async function sendGameInvite(friendId) {
       currentPlayers: game.players.length,
       maxPlayers: roomClient.maxPlayers
     });
-    if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = `Game invite sent to ${friend.nickname}.`;
-    if (button) button.textContent = "Sent";
+    if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "";
+    if (button) button.textContent = "보냄";
   } catch (error) {
     console.error("Failed to send game invite:", error);
     if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = error.message || "Could not send game invite.";
     if (button) button.textContent = previousButtonText;
   } finally {
-    if (button) button.disabled = button.textContent === "Sent";
+    if (button) button.disabled = button.textContent === "보냄";
   }
 }
 
@@ -1260,6 +1381,9 @@ function renderLobby() {
   const showLobby = isLobbyPhase();
   els.lobbyScreen.hidden = !showLobby;
   els.gameBoard.hidden = showLobby;
+  if (els.leaveRoomButton) {
+    els.leaveRoomButton.hidden = !showLobby || game.phase !== "waiting" || !roomClient.joined;
+  }
   if (!showLobby) return;
 
   const showWaitingLobby = game.phase === "waiting" && roomClient.joined;
@@ -1303,8 +1427,9 @@ function renderLobby() {
   els.waitingRoomMeta.textContent = "";
   els.waitingRoomMeta.hidden = true;
 
+  const allPlayersReady = game.players.length >= 2 && game.players.every((player) => player.isReady);
   els.startGameButton.hidden = !isHost;
-  els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 2;
+  els.startGameButton.disabled = !roomClient.joined || !isHost || !allPlayersReady;
 
   /*
     innerHTML replaces the whole player-list container with newly generated HTML.
@@ -1313,7 +1438,7 @@ function renderLobby() {
   const playerSlots = game.players.map((player, index) => {
     const isMe = player.id === game.localPlayerId;
     const isReady = player.isReady;
-    const statusText = isReady ? "준비 완료" : "준비중";
+    const statusText = isReady ? "준비 완료" : "준비 중";
     // const hostLabel = player.isHost ? `<img class="room-crown-icon" src="/Images/crown_icon.png" alt="방장" />` : "";
     const hostLabel = player.isHost ? `<span class="waiting-player-badge">방장</span>` : "";
 
@@ -1691,6 +1816,7 @@ function render() {
     Whenever state changes, call render() so the visible UI matches game state.
     This project uses manual rendering rather than a framework like React.
   */
+  syncBgmWithScreen();
   els.screenTitle.textContent = currentTitle();
   renderLobby();
 
@@ -1814,7 +1940,7 @@ function startTurnCountdown(seconds) {
   // run this function every second
   // turnTimer = timer id
   turnTimer = setInterval(() => {
-    game.turnSeconds -= 1;
+    game.turnSeconds = Math.max(0, game.turnSeconds - 1);
     els.timerNumber.textContent = game.turnSeconds;
     if (game.turnSeconds <= 0) {
       clearInterval(turnTimer);
@@ -1827,12 +1953,13 @@ function startTurnCountdown(seconds) {
 
 function startChoiceCountdown(seconds) {
   // Countdown shown during the peek/choice phase.
+  clearInterval(turnTimer);
   clearInterval(choiceTimer);
   game.choiceSeconds = seconds;
   els.timerNumber.textContent = seconds;
   if (els.choicePopupTime) els.choicePopupTime.textContent = seconds;
   choiceTimer = setInterval(() => {
-    game.choiceSeconds -= 1;
+    game.choiceSeconds = Math.max(0, game.choiceSeconds - 1);
     els.timerNumber.textContent = game.choiceSeconds;
     if (els.choicePopupTime) els.choicePopupTime.textContent = game.choiceSeconds;
     if (game.choiceSeconds <= 0) clearInterval(choiceTimer);
@@ -1849,7 +1976,7 @@ function startFinalCountdown(seconds) {
   els.timerNumber.textContent = seconds;
   if (els.finalPopupTime) els.finalPopupTime.textContent = seconds;
   turnTimer = setInterval(() => {
-    game.turnSeconds -= 1;
+    game.turnSeconds = Math.max(0, game.turnSeconds - 1);
     els.timerNumber.textContent = game.turnSeconds;
     if (els.finalPopupTime) els.finalPopupTime.textContent = game.turnSeconds;
     if (game.turnSeconds <= 0) {
@@ -2801,9 +2928,9 @@ function submitFinalAnswer(autoSubmit = false) {
     answer[channel] = value;
   }
 
-  clearInterval(turnTimer);
   game.finalAnswer = { ...answer };
   game.finalSubmitted = true;
+
   socket.emit("submit_final_guess", {
     roomCode: roomClient.roomCode,
     guessRGB: answer
@@ -2930,8 +3057,12 @@ function handlePeekingStart(data) {
     Other players can choose one channel to peek. The current player does not
     get the choice modal, because they already saw their own feedback.
   */
+  clearInterval(turnTimer);
+  clearInterval(choiceTimer);
+
   if (data.turnUserId === game.localPlayerId) {
     game.choiceSeconds = data.timeLimit || 10;
+    startChoiceCountdown(game.choiceSeconds);
     return;
   }
 
@@ -3107,7 +3238,17 @@ document.addEventListener("click", () => {
   button.addEventListener("click", async () => {
     closeProfileMenus();
     await stopPresenceTracking();
+    if (isGuestUser()) {
+      try {
+        const { deleteGuestAccount } = await import(LOGIN_MODULE_URL);
+        await deleteGuestAccount(mockCurrentUser.id);
+      } catch (error) {
+        console.error("Failed to delete guest account:", error);
+        sendGuestLogoutBeacon();
+      }
+    }
     clearLoginSession();
+    markInternalNavigation();
     window.location.href = LOGIN_PAGE_URL;
   });
 });
@@ -3223,41 +3364,31 @@ if (els.inviteFriendLayer) {
 //   });
 // }
 
-if (els.volumeButton && els.volumeSliderWrap) {
-  // Toggle the volume slider open/closed.
-  els.volumeButton.addEventListener("click", () => {
-    const nextOpen = els.volumeSliderWrap.hidden;
-    els.volumeSliderWrap.hidden = !nextOpen;
-    els.volumeButton.setAttribute("aria-expanded", String(nextOpen));
+document.querySelectorAll(".lobby-volume-control, .waiting-volume-control, .volume-control").forEach((control) => {
+  const button = control.querySelector(".lobby-volume-button, .waiting-volume-button, .volume-button");
+  const sliderWrap = control.querySelector(".lobby-volume-slider-wrap, .waiting-volume-slider-wrap, .volume-slider-wrap");
+  if (!button || !sliderWrap) return;
+  button.addEventListener("click", () => {
+    const nextOpen = sliderWrap.hidden;
+    sliderWrap.hidden = !nextOpen;
+    button.setAttribute("aria-expanded", String(nextOpen));
   });
-}
+});
 
-if (els.lobbyVolumeButton && els.lobbyVolumeSliderWrap) {
-  // Lobby volume uses its own vertical slider above the button.
-  els.lobbyVolumeButton.addEventListener("click", () => {
-    const nextOpen = els.lobbyVolumeSliderWrap.hidden;
-    els.lobbyVolumeSliderWrap.hidden = !nextOpen;
-    els.lobbyVolumeButton.setAttribute("aria-expanded", String(nextOpen));
+allVolumeSliders().forEach((slider) => {
+  slider.addEventListener("input", (event) => {
+    unlockBgmPlayback();
+    setBgmVolume(event.target.value);
   });
-}
+});
 
-if (els.rankingVolumeButton && els.rankingVolumeSliderWrap) {
-  // Ranking page volume uses the same vertical slider pattern as the lobby.
-  els.rankingVolumeButton.addEventListener("click", () => {
-    const nextOpen = els.rankingVolumeSliderWrap.hidden;
-    els.rankingVolumeSliderWrap.hidden = !nextOpen;
-    els.rankingVolumeButton.setAttribute("aria-expanded", String(nextOpen));
-  });
-}
+allVolumeButtons().forEach((button) => {
+  button.addEventListener("click", unlockBgmPlayback);
+});
 
-if (els.friendsVolumeButton && els.friendsVolumeSliderWrap) {
-  // Friends page volume uses the same vertical slider pattern as the lobby.
-  els.friendsVolumeButton.addEventListener("click", () => {
-    const nextOpen = els.friendsVolumeSliderWrap.hidden;
-    els.friendsVolumeSliderWrap.hidden = !nextOpen;
-    els.friendsVolumeButton.setAttribute("aria-expanded", String(nextOpen));
-  });
-}
+document.addEventListener("pointerdown", unlockBgmPlayback, { once: true });
+document.addEventListener("keydown", unlockBgmPlayback, { once: true });
+setBgmVolume(bgmVolume);
 
 els.closeChoice.addEventListener("click", () => {
   // This only hides the modal locally. The server still owns the actual phase timing.
@@ -3303,7 +3434,16 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("pagehide", () => {
+  if (!consumeInternalNavigationFlag()) {
+    sendGuestLogoutBeacon();
+  }
   stopPresenceTracking();
+});
+
+window.addEventListener("beforeunload", () => {
+  if (!consumeInternalNavigationFlag()) {
+    sendGuestLogoutBeacon();
+  }
 });
 
 
