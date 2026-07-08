@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/Images/favicon_icon.png">
+  <title>Color Master</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.min.css" />
+  <link rel="stylesheet" href="common.css" />
+  <link rel="stylesheet" href="lobby.css" />
+</head>
+<body data-page="lobby">
+  <main class="app">
+    <h1 class="screen-title" id="screenTitle">Color Master Lobby</h1>
+    <section class="lobby-screen" id="lobbyScreen" aria-label="Color Master lobby">
+      <div class="lobby-card">
+        <!-- Main lobby: shows rooms that have been created and are still waiting. -->
+        <section class="main-lobby-panel" id="mainLobbyPanel" aria-label="Waiting rooms">
+          <div class="lobby-top-actions" aria-label="Lobby navigation">
+            <button class="lobby-nav-button" id="leaderBoardsButton" type="button" aria-label="Leader Boards">
+              <img class="nav-button-icon" src="/Images/ranking_icon.png" alt="" />
+            </button>
+            <button class="lobby-nav-button" id="friendsButton" type="button" aria-label="Friends">
+              <img class="nav-button-icon" src="/Images/friends_icon.png" alt="" />
+            </button>
+            <button class="lobby-nav-button" id="mailboxButton" type="button" aria-label="Mailbox">
+              <img class="nav-button-icon" src="/Images/mailbox_icon.png" alt="" />
+            </button>
+            <button class="lobby-home-button" id="homeButton" type="button" aria-label="Home" disabled>
+              <img class="lobby-home-icon" src="/Images/home_icon.png" alt="" />
+            </button>
+          </div>
+
+          <div class="lobby-main-layout">
+            <aside class="lobby-left-rail" aria-label="Logged-in user">
+              <section class="lobby-profile-box" id="lobbyProfileBox" role="button" tabindex="0" aria-controls="lobbyProfileMenu" aria-expanded="false">
+                <img class="lobby-profile-image" id="lobbyProfileImage" alt="" />
+                <div class="lobby-profile-text">
+                  <div class="lobby-profile-name" id="lobbyNickname">Player</div>
+                  <div class="lobby-profile-rp" id="lobbyRankingPoint">0 RP</div>
+                </div>
+              </section>
+
+              <div class="profile-action-menu" id="lobbyProfileMenu" hidden>
+                <button class="profile-action-button" id="lobbyUserInfoButton" type="button">유저 정보</button>
+                <button class="profile-action-button" id="lobbyProfileLogOutButton" type="button">로그아웃</button>
+              </div>
+
+              <!-- Hidden for now: the real server still uses this value as the in-room nickname. -->
+              <input class="lobby-hidden-input" id="nicknameInput" type="text" autocomplete="off" tabindex="-1" aria-hidden="true" />
+
+            </aside>
+
+            <section class="lobby-room-panel" aria-label="Room list">
+              <div class="lobby-room-heading">
+                <button class="lobby-button lobby-create-button" id="openCreateRoomButton" type="button">방 만들기</button>
+                <!-- aria-live="polite" tells screen readers to announce text changes here without interrupting. -->
+                <p class="lobby-status lobby-status-hidden" id="lobbyStatus" aria-live="polite"></p>
+              </div>
+
+              <!-- Empty on purpose: JavaScript fills this with the current room list. -->
+              <div class="room-list" id="roomList" aria-label="Currently waiting rooms"></div>
+            </section>
+          </div>
+
+          <div class="lobby-volume-control">
+            <div class="lobby-volume-slider-wrap" id="lobbyVolumeSliderWrap" hidden>
+              <input class="lobby-volume-slider" id="lobbyVolumeSlider" type="range" min="0" max="100" value="70" aria-label="Lobby volume" />
+            </div>
+            <button class="lobby-volume-button" id="lobbyVolumeButton" type="button" aria-label="Volume" aria-expanded="false">
+              <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+            </button>
+          </div>
+        </section>
+
+        <!-- Ranking page: shown when the logged-in user opens Leader Boards. -->
+        <section class="ranking-page-panel" id="rankingPagePanel" aria-label="Leader boards" hidden>
+          <div class="lobby-top-actions" aria-label="Ranking navigation">
+            <button class="lobby-nav-button" id="rankingLeaderBoardsButton" type="button" aria-label="Leader Boards" disabled>
+              <img class="nav-button-icon" src="/Images/ranking_icon.png" alt="" />
+            </button>
+            <button class="lobby-nav-button" id="rankingFriendsButton" type="button" aria-label="Friends">
+              <img class="nav-button-icon" src="/Images/friends_icon.png" alt="" />
+            </button>
+            <button class="lobby-nav-button" id="rankingMailboxButton" type="button" aria-label="Mailbox">
+              <img class="nav-button-icon" src="/Images/mailbox_icon.png" alt="" />
+            </button>
+            <button class="lobby-home-button" id="rankingHomeButton" type="button" aria-label="Home">
+              <img class="lobby-home-icon" src="/Images/home_icon.png" alt="" />
+            </button>
+          </div>
+
+          <div class="lobby-main-layout">
+            <aside class="lobby-left-rail" aria-label="Logged-in user">
+              <section class="lobby-profile-box" id="rankingProfileBox" role="button" tabindex="0" aria-controls="rankingProfileMenu" aria-expanded="false">
+                <img class="lobby-profile-image" id="rankingProfileImage" alt="" />
+                <div class="lobby-profile-text">
+                  <div class="lobby-profile-name" id="rankingNickname">Player</div>
+                  <div class="lobby-profile-rp" id="rankingRankingPoint">0 RP</div>
+                </div>
+              </section>
+
+              <div class="profile-action-menu" id="rankingProfileMenu" hidden>
+                <button class="profile-action-button" id="rankingUserInfoButton" type="button">유저 정보</button>
+                <button class="profile-action-button" id="rankingProfileLogOutButton" type="button">로그아웃</button>
+              </div>
+            </aside>
+
+            <section class="ranking-panel" aria-label="Ranking table">
+              <div class="lobby-room-heading" hidden>
+                <div>
+                  <p class="eyebrow">PLAYER RANKING</p>
+                  <h2 class="lobby-title">Leader Boards</h2>
+                </div>
+                <p class="lobby-status" id="rankingStatus" aria-live="polite">Highest ranking points first.</p>
+              </div>
+
+              <div class="ranking-tabs" aria-label="Ranking type">
+                <button class="ranking-tab-button is-active" id="allRankingTabButton" type="button" aria-pressed="true">전체 랭킹</button>
+                <button class="ranking-tab-button" id="friendRankingTabButton" type="button" aria-pressed="false">친구 랭킹</button>
+              </div>
+
+              <div class="ranking-table-wrap">
+                <table class="ranking-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Profile</th>
+                      <th>Nickname</th>
+                      <th>Ranking Point</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rankingTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <div class="lobby-volume-control">
+            <div class="lobby-volume-slider-wrap" id="rankingVolumeSliderWrap" hidden>
+              <input class="lobby-volume-slider" id="rankingVolumeSlider" type="range" min="0" max="100" value="70" aria-label="Ranking page volume" />
+            </div>
+            <button class="lobby-volume-button" id="rankingVolumeButton" type="button" aria-label="Volume" aria-expanded="false">
+              <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+            </button>
+          </div>
+        </section>
+
+        <!-- Friends page: shown when the logged-in user opens Friends. -->
+        <section class="friends-page-panel" id="friendsPagePanel" aria-label="Friends" hidden>
+          <div class="lobby-top-actions" aria-label="Friends navigation">
+            <button class="lobby-nav-button" id="friendsLeaderBoardsButton" type="button" aria-label="Leader Boards">
+              <img class="nav-button-icon" src="/Images/ranking_icon.png" alt="" />
+            </button>
+            <button class="lobby-nav-button" id="friendsFriendsButton" type="button" aria-label="Friends" disabled>
+              <img class="nav-button-icon" src="/Images/friends_icon.png" alt="" />
+            </button>
+            <button class="lobby-nav-button" id="friendsMailboxButton" type="button" aria-label="Mailbox">
+              <img class="nav-button-icon" src="/Images/mailbox_icon.png" alt="" />
+            </button>
+            <button class="lobby-home-button" id="friendsHomeButton" type="button" aria-label="Home">
+              <img class="lobby-home-icon" src="/Images/home_icon.png" alt="" />
+            </button>
+          </div>
+
+          <div class="lobby-main-layout">
+            <aside class="lobby-left-rail" aria-label="Logged-in user">
+              <section class="lobby-profile-box" id="friendsProfileBox" role="button" tabindex="0" aria-controls="friendsProfileMenu" aria-expanded="false">
+                <img class="lobby-profile-image" id="friendsProfileImage" alt="" />
+                <div class="lobby-profile-text">
+                  <div class="lobby-profile-name" id="friendsNickname">Player</div>
+                  <div class="lobby-profile-rp" id="friendsRankingPoint">0 RP</div>
+                </div>
+              </section>
+
+              <div class="profile-action-menu" id="friendsProfileMenu" hidden>
+                <button class="profile-action-button" id="friendsUserInfoButton" type="button">유저 정보</button>
+                <button class="profile-action-button" id="friendsProfileLogOutButton" type="button">로그아웃</button>
+              </div>
+            </aside>
+
+            <section class="friends-panel" aria-label="Friends table">
+              <div class="lobby-room-heading">
+                <div class="friends-action-row">
+                  <button class="lobby-button friends-add-button" id="addFriendButton" type="button">친구 추가</button>
+                  <button class="lobby-button lobby-button-secondary friends-delete-mode-button" id="deleteFriendModeButton" type="button" aria-pressed="false">친구 삭제</button>
+                </div>
+              </div>
+
+              <div class="lobby-room-heading" hidden>
+                <div>
+                  <p class="eyebrow">SOCIAL</p>
+                  <h2 class="lobby-title">Friends</h2>
+                </div>
+                <p class="lobby-status" id="friendsStatus" aria-live="polite">Recently added friends appear lower.</p>
+              </div>
+
+              <div class="friends-table-wrap">
+                <table class="friends-table">
+                  <thead>
+                    <tr>
+                      <th>No.</th>
+                      <th>Profile</th>
+                      <th>Nickname</th>
+                      <th>Ranking Point</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="friendsTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <div class="lobby-volume-control">
+            <div class="lobby-volume-slider-wrap" id="friendsVolumeSliderWrap" hidden>
+              <input class="lobby-volume-slider" id="friendsVolumeSlider" type="range" min="0" max="100" value="70" aria-label="Friends page volume" />
+            </div>
+            <button class="lobby-volume-button" id="friendsVolumeButton" type="button" aria-label="Volume" aria-expanded="false">
+              <img class="volume-icon" src="/Images/volume_icon.png" alt="" />
+            </button>
+          </div>
+        </section>
+
+      </div>
+      <!-- Create-room popup. It is hidden until the user clicks "Create a room". -->
+      <div class="create-room-layer" id="createRoomLayer" hidden>
+        <div class="create-room-panel" role="dialog" aria-modal="true" aria-labelledby="createRoomTitle">
+          <div class="create-room-header">
+            <h3 class="lobby-section-title create-room-title" id="createRoomTitle">방 만들기</h3>
+            <button class="user-info-close-button create-room-close-button" id="closeCreateRoomButton" type="button" aria-label="Close create room">
+              <img class="user-info-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
+          </div>
+
+          <div class="create-room-form">
+            <label class="lobby-field">
+              <span>Room Name</span>
+              <input id="createRoomNameInput" type="text" autocomplete="off" maxlength="32" />
+            </label>
+            <label class="lobby-field">
+              <span>Room Code (optional)</span>
+              <input id="createRoomCodeInput" type="text" autocomplete="off" maxlength="18" />
+            </label>
+            <label class="lobby-field">
+              <span>Room Level</span>
+              <select id="createLevelSelect">
+                <option value="1">Easy</option>
+                <option value="2">Normal</option>
+                <option value="3">Hard</option>
+                <option value="4">Extreme</option>
+              </select>
+            </label>
+            <label class="lobby-field">
+              <span>Players</span>
+              <select id="maxPlayersSelect">
+                <option value="2">2 players</option>
+                <option value="3">3 players</option>
+                <option value="4">4 players</option>
+                <option value="5">5 players</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="lobby-actions">
+            <button class="lobby-button create-room-submit-button" id="createRoomButton" type="button">방 만들기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Private-room code popup. It replaces the browser prompt for private rooms. -->
+      <div class="private-room-code-layer" id="privateRoomCodeLayer" hidden>
+        <div class="private-room-code-panel" role="dialog" aria-modal="true" aria-labelledby="privateRoomCodeTitle">
+          <div class="create-room-header">
+            <h3 class="lobby-section-title" id="privateRoomCodeTitle">Room Code</h3>
+            <!-- <button class="popup-close" id="closePrivateRoomCodeButton" type="button" aria-label="Close private room code">x</button> -->
+            <button class="user-info-close-button private-room-code-close-button" id="closePrivateRoomCodeButton" type="button" aria-label="Close private room code">
+              <img class="popup-close-icon" src="/Images/close_icon.png" alt="닫기" />
+            </button>
+          </div>
+
+          <label class="lobby-field">
+            <input id="privateRoomCodeInput" type="text" autocomplete="off" maxlength="18" />
+          </label>
+
+          <button class="lobby-button private-room-code-submit-button" id="submitPrivateRoomCodeButton" type="button">Join Room</button>
+        </div>
+      </div>
+
+      <div class="lobby-alert-layer" id="lobbyAlertLayer" hidden>
+        <div class="lobby-alert-panel" role="dialog" aria-modal="true" aria-labelledby="lobbyAlertMessage">
+          <p class="lobby-alert-message" id="lobbyAlertMessage"></p>
+          <button class="lobby-button lobby-alert-button" id="lobbyAlertConfirmButton" type="button">확인</button>
+        </div>
+      </div>
+
+      <!-- Add-friend popup. It is hidden until the user clicks "Add Friend". -->
+      <div class="add-friend-layer" id="addFriendLayer" hidden>
+        <div class="add-friend-panel" role="dialog" aria-modal="true" aria-labelledby="addFriendTitle">
+          <div class="add-friend-header">
+            <h3 class="lobby-section-title add-friend-title" id="addFriendTitle">친구 신청</h3>
+            <button class="user-info-close-button add-friend-close-button" id="closeAddFriendButton" type="button" aria-label="Close add friend">
+              <img class="user-info-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
+          </div>
+
+          <label class="lobby-field">
+            <input id="addFriendNicknameInput" type="text" autocomplete="off" maxlength="32" placeholder="닉네임을 입력하세요" />
+          </label>
+
+          <button class="lobby-button add-friend-submit-button" id="sendFriendRequestButton" type="button">요청 보내기</button>
+        </div>
+      </div>
+
+      <!-- Mailbox popup. It is hidden until the user clicks "Mailbox". -->
+      <div class="mailbox-layer" id="mailboxLayer" hidden>
+        <div class="mailbox-panel" role="dialog" aria-modal="true" aria-labelledby="mailboxTitle">
+          <div class="mailbox-header">
+            <div>
+              <p class="eyebrow" hidden>NOTICES</p>
+              <h3 class="lobby-section-title" id="mailboxTitle">알림함</h3>
+            </div>
+            <button class="mailbox-close-button" id="mailboxCloseButton" type="button" aria-label="Close mailbox">
+              <img class="mailbox-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
+          </div>
+
+          <p class="lobby-status lobby-status-hidden" id="mailboxStatus" aria-live="polite"></p>
+
+          <!-- Empty on purpose: JavaScript fills this with notice buttons. -->
+          <div class="mailbox-notice-list" id="mailboxNoticeList"></div>
+        </div>
+      </div>
+
+      <!-- User-info popup. It is hidden until the user clicks "User Info". -->
+      <div class="user-info-layer" id="userInfoLayer" hidden>
+        <div class="user-info-panel" role="dialog" aria-modal="true" aria-labelledby="userInfoTitle">
+          <button class="user-info-close-button" id="closeUserInfoButton" type="button" aria-label="Close user info">
+            <img class="user-info-close-icon" src="/Images/close_icon.png" alt="" />
+          </button>
+
+          <h3 class="lobby-section-title user-info-title" id="userInfoTitle" hidden>User Info</h3>
+
+          <div class="user-info-profile-area">
+            <img class="user-info-main-image" id="userInfoMainImage" alt="" />
+            <button class="profile-action-button user-info-image-edit-button" id="editProfileImageButton" type="button">프로필 사진 수정</button>
+            <input id="profileImageFileInput" type="file" accept="image/*" hidden />
+          </div>
+
+          <table class="user-info-table" aria-label="Editable user information">
+            <colgroup>
+              <col class="user-info-col-label" />
+              <col class="user-info-col-input" />
+              <col class="user-info-col-action" />
+            </colgroup>
+            <tbody>
+            <tr>
+              <th scope="row">이메일</th>
+              <td class="user-info-wide-cell" colspan="2">
+                <div class="user-info-input-stack">
+                  <input class="user-info-input" id="userInfoEmailInput" type="email" disabled />
+                  <span class="user-info-status" data-user-info-status="userInfoEmailInput"></span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">닉네임</th>
+              <td>
+                <div class="user-info-input-stack">
+                  <input class="user-info-input" id="userInfoNicknameInput" type="text" disabled />
+                  <span class="user-info-status" data-user-info-status="userInfoNicknameInput"></span>
+                </div>
+              </td>
+              <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoNicknameInput">수정</button></td>
+            </tr>
+            <tr>
+              <th scope="row">아이디</th>
+              <td>
+                <div class="user-info-input-stack">
+                  <input class="user-info-input" id="userInfoIdInput" type="text" disabled />
+                  <span class="user-info-status" data-user-info-status="userInfoIdInput"></span>
+                </div>
+              </td>
+              <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoIdInput">수정</button></td>
+            </tr>
+            <tr>
+              <th scope="row">비밀번호</th>
+              <td>
+                <div class="user-info-input-stack">
+                  <input class="user-info-input" id="userInfoPasswordInput" type="password" disabled />
+                  <span class="user-info-status" data-user-info-status="userInfoPasswordInput"></span>
+                </div>
+              </td>
+              <td><button class="profile-action-button user-info-edit-button" type="button" data-user-info-edit="userInfoPasswordInput">수정</button></td>
+            </tr>
+            </tbody>
+          </table>
+
+          <button class="lobby-button user-info-save-button" id="saveUserInfoButton" type="button">저장</button>
+        </div>
+      </div>
+
+      <!-- Mailbox detail popup. It opens when a notice message is clicked. -->
+      <div class="mailbox-detail-layer" id="mailboxDetailLayer" hidden>
+        <div class="mailbox-detail-panel" role="dialog" aria-modal="true" aria-labelledby="mailboxDetailTitle">
+          <div class="mailbox-detail-header">
+            <h3 class="lobby-section-title" id="mailboxDetailTitle">Notice</h3>
+            <button class="user-info-close-button mailbox-detail-close-button" id="closeMailboxDetailButton" type="button" aria-label="Close mailbox notice">
+              <img class="user-info-close-icon" src="/Images/close_icon.png" alt="" />
+            </button>
+          </div>
+
+          <div class="mailbox-detail-content" id="mailboxDetailContent"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="lobby.js"></script>
+</body>
+</html>

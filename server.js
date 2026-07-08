@@ -1,8 +1,9 @@
 /*
   Color Master backend server.
 
-  The browser code in colormaster_redesign.js controls the screen that each
-  player sees. This file controls the shared multiplayer state:
+  The browser code in Public/common.js, Public/lobby.js, and Public/game.js
+  controls the screens that each player sees. This file controls the shared
+  multiplayer state:
   - which rooms exist
   - who is in each room
   - whose turn it is
@@ -18,11 +19,27 @@
 // path is a built-in Node.js module for safely building file paths.
 const path = require("path");
 
+// fs reads the Firebase service-account JSON file from disk.
+const fs = require("fs");
+
+// crypto creates a random download token for uploaded profile images.
+const crypto = require("crypto");
+
 // express serves the HTML/CSS/JS/image files to the browser.
 const express = require("express");
 
 // http creates the actual web server that Express and Socket.IO share.
 const http = require("http");
+
+// firebase-admin lets this trusted Node server write to Firestore/Storage.
+const { initializeApp, cert } = require("firebase-admin/app");
+// const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getStorage } = require("firebase-admin/storage");
+const { getAuth } = require("firebase-admin/auth");
+
+// multer parses multipart/form-data file uploads from the browser.
+const multer = require("multer");
 
 // Socket.IO provides real-time browser <-> server events.
 const { Server } = require("socket.io");
@@ -35,6 +52,100 @@ const server = http.createServer(app);
 
 // io is the Socket.IO server. Use it to listen for connections and emit events.
 const io = new Server(server);
+
+app.use(express.json({ limit: "32kb" }));
+app.use(express.text({ type: "text/plain", limit: "32kb" }));
+
+const FIREBASE_STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || "colormaster-madcamp.firebasestorage.app";
+const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
+  || path.join(__dirname, "secrets", "firebase-service-account.json");
+
+let adminDb = null;
+let adminBucket = null;
+let adminAuth = null;
+
+function initializeFirebaseAdmin() {
+  /*
+    This server-side Firebase connection is used only for trusted backend work.
+    The service account file must stay out of Git because it is a private key.
+  */
+  if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+    console.warn(`Firebase service account not found: ${SERVICE_ACCOUNT_PATH}`);
+    console.warn("Profile image upload API will return 503 until it is configured.");
+    return;
+  }
+
+  const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
+  const firebaseApp = initializeApp({
+    credential: cert(serviceAccount),
+    storageBucket: FIREBASE_STORAGE_BUCKET
+  });
+
+  adminDb = getFirestore(firebaseApp);
+  adminBucket = getStorage(firebaseApp).bucket();
+  adminAuth = getAuth(firebaseApp);
+}
+
+initializeFirebaseAdmin();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024
+  }
+});
+
+function profileImageProxyUrl(filePath) {
+  // Store and return an app-local URL so browsers load images through EC2.
+  return `/api/profile-image-file?path=${encodeURIComponent(filePath)}`;
+}
+
+function cleanProfileImagePath(rawPath) {
+  /*
+    Only allow files inside the profile_images folder.
+    This prevents the image proxy from becoming a general Firebase file reader.
+  */
+  const filePath = String(rawPath || "").trim();
+  if (!filePath.startsWith("profile_images/") || filePath.includes("..")) return "";
+  return filePath;
+}
+
+async function deleteUserSubcollectionAdmin(userId, subcollectionName) {
+  const snapshot = await adminDb.collection("User").doc(userId).collection(subcollectionName).get();
+  await Promise.all(snapshot.docs.map((itemDoc) => itemDoc.ref.delete()));
+}
+
+async function deleteGuestAccountAdmin(userId) {
+  const cleanUserId = String(userId || "").trim();
+  if (!cleanUserId || !adminDb) return false;
+
+  const userDocRef = adminDb.collection("User").doc(cleanUserId);
+  const userDoc = await userDocRef.get();
+  if (!userDoc.exists) return false;
+
+  const userData = userDoc.data() || {};
+  if (!userData.isGuest) return false;
+
+  const friendsSnapshot = await userDocRef.collection("Friends").get();
+  await Promise.all(friendsSnapshot.docs.map((friendDoc) => {
+    const friendData = friendDoc.data() || {};
+    const friendUserId = friendData.fd_id || friendData.userId || friendDoc.id;
+    return adminDb.collection("User").doc(friendUserId).collection("Friends").doc(cleanUserId).delete();
+  }));
+
+  await Promise.all([
+    deleteUserSubcollectionAdmin(cleanUserId, "Friends"),
+    deleteUserSubcollectionAdmin(cleanUserId, "Mailbox")
+  ]);
+
+  await userDocRef.delete();
+  if (adminAuth) {
+    await adminAuth.deleteUser(cleanUserId).catch((error) => {
+      if (error?.code !== "auth/user-not-found") throw error;
+    });
+  }
+  return true;
+}
 
 /*
   Central game settings.
@@ -80,22 +191,179 @@ const activeRooms = new Map();
   - Images contains PNG assets used by the HTML.
 
   app.use(express.static(PUBLIC_DIR)) lets the browser request:
-  /colormaster_redesign.css
-  /colormaster_redesign.js
+  /auth.js
+  /lobby.js
+  /game.js
 
   app.use("/Images", express.static(IMAGE_DIR)) lets the browser request:
   /Images/exit_icon.png
 */
 const PUBLIC_DIR = path.join(__dirname, "Public");
 const IMAGE_DIR = path.join(__dirname, "Images");
+const BGM_DIR = path.join(__dirname, "BGM");
+const AUTH_HTML = path.join(PUBLIC_DIR, "auth.html");
+const LOBBY_HTML = path.join(PUBLIC_DIR, "lobby.html");
+const GAME_HTML = path.join(PUBLIC_DIR, "game.html");
 
-// When the user opens http://localhost:3000/, send the main game HTML.
-app.get("/", (_req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "colormaster_redesign.html"));
+// Split top-level pages.
+app.get(["/", "/login", "/auth.html", "/index.html"], (_req, res) => {
+  res.sendFile(AUTH_HTML);
+});
+
+app.get("/lobby.html", (_req, res) => {
+  res.sendFile(LOBBY_HTML);
+});
+
+app.get("/game.html", (_req, res) => {
+  res.sendFile(GAME_HTML);
+});
+
+app.get("/login.js", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "login.js"));
+});
+
+app.get("/auth.css", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "auth.css"));
+});
+
+app.get("/common.css", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "common.css"));
+});
+
+app.get("/lobby.css", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "lobby.css"));
+});
+
+app.get("/game.css", (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "game.css"));
+});
+
+app.post("/api/guest-logout", async (req, res) => {
+  try {
+    if (!adminDb) {
+      return res.status(503).json({ error: "Firebase Admin is not configured on the server." });
+    }
+
+    let body = {};
+    if (typeof req.body === "string") {
+      try {
+        body = JSON.parse(req.body || "{}");
+      } catch (_error) {
+        body = {};
+      }
+    } else {
+      body = req.body || {};
+    }
+
+    const deleted = await deleteGuestAccountAdmin(body.userId || req.query.userId);
+    res.json({ deleted });
+  } catch (error) {
+    console.error("Guest logout cleanup failed:", error);
+    res.status(500).json({ error: "Guest logout cleanup failed." });
+  }
+});
+
+app.post("/api/profile-image", upload.single("profileImage"), async (req, res) => {
+  /*
+    Profile image upload proxy:
+    Browser -> this Express server -> Firebase Storage + Firestore.
+
+    This avoids uploading directly from the browser to Firebase Storage. On EC2,
+    this same route will run on the Ubuntu server and the upload traffic to
+    Firebase will originate from EC2.
+  */
+  try {
+    if (!adminDb || !adminBucket) {
+      return res.status(503).json({ error: "Firebase Admin is not configured on the server." });
+    }
+
+    const userId = String(req.body.userId || "").trim();
+    const file = req.file;
+    const allowedTypes = new Map([
+      ["image/jpeg", "jpg"],
+      ["image/png", "png"],
+      ["image/webp", "webp"],
+      ["image/gif", "gif"]
+    ]);
+
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId." });
+    }
+
+    if (!file || !allowedTypes.has(file.mimetype)) {
+      return res.status(400).json({ error: "Please upload a JPG, PNG, WEBP, or GIF image." });
+    }
+
+    const extension = allowedTypes.get(file.mimetype);
+    const token = crypto.randomUUID();
+    const filePath = `profile_images/${userId}_${Date.now()}.${extension}`;
+    const storageFile = adminBucket.file(filePath);
+
+    await storageFile.save(file.buffer, {
+      resumable: false,
+      metadata: {
+        contentType: file.mimetype,
+        metadata: {
+          firebaseStorageDownloadTokens: token
+        }
+      }
+    });
+
+    const profileImageUrl = profileImageProxyUrl(filePath);
+
+    await adminDb.collection("User").doc(userId).update({
+      profile_image: profileImageUrl
+    });
+
+    res.json({
+      profileImage: profileImageUrl
+    });
+  } catch (error) {
+    console.error("Profile image upload failed:", error);
+    res.status(500).json({ error: "Profile image upload failed." });
+  }
+});
+
+app.get("/api/profile-image-file", async (req, res) => {
+  /*
+    Profile image display proxy:
+    Browser -> this Express server -> Firebase Storage.
+
+    This solves the remaining ERR_SSL_PROTOCOL_ERROR case where the browser
+    could upload through EC2, but then tried to display the image directly from
+    firebasestorage.googleapis.com.
+  */
+  try {
+    if (!adminBucket) {
+      return res.status(503).send("Firebase Admin is not configured on the server.");
+    }
+
+    const filePath = cleanProfileImagePath(req.query.path);
+    if (!filePath) {
+      return res.status(400).send("Invalid profile image path.");
+    }
+
+    const storageFile = adminBucket.file(filePath);
+    const [metadata] = await storageFile.getMetadata();
+    res.setHeader("Content-Type", metadata.contentType || "application/octet-stream");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+
+    storageFile.createReadStream()
+      .on("error", (error) => {
+        console.error("Profile image proxy failed:", error);
+        if (!res.headersSent) res.status(404).send("Profile image not found.");
+        else res.destroy(error);
+      })
+      .pipe(res);
+  } catch (error) {
+    console.error("Profile image proxy failed:", error);
+    res.status(500).send("Profile image proxy failed.");
+  }
 });
 
 app.use(express.static(PUBLIC_DIR));
 app.use("/Images", express.static(IMAGE_DIR));
+app.use("/BGM", express.static(BGM_DIR));
 
 function clamp(value, min, max) {
   // Restrict a number so it cannot go below min or above max.
@@ -196,6 +464,44 @@ function errorsFor(target, guess) {
   };
 }
 
+function createBoundaries() {
+  return {
+    r: { low: 0, high: 255 },
+    g: { low: 0, high: 255 },
+    b: { low: 0, high: 255 }
+  };
+}
+
+function midpointGuess(boundaries = createBoundaries()) {
+  return {
+    r: Math.round((boundaries.r.low + boundaries.r.high) / 2),
+    g: Math.round((boundaries.g.low + boundaries.g.high) / 2),
+    b: Math.round((boundaries.b.low + boundaries.b.high) / 2)
+  };
+}
+
+function tightenPlayerBoundaries(player, guess, feedback, channels = ["r", "g", "b"]) {
+  if (!player.boundaries) player.boundaries = createBoundaries();
+  const errorLimitByTier = {
+    blue: 0,
+    green: 10,
+    yellow: 50,
+    orange: 150,
+    red: 255
+  };
+
+  channels.forEach((channel) => {
+    const value = Number(guess?.[channel]);
+    const tier = feedback?.[channel];
+    const errorLimit = errorLimitByTier[tier];
+    if (!Number.isInteger(value) || errorLimit === undefined) return;
+
+    const bounds = player.boundaries[channel];
+    bounds.low = Math.max(bounds.low, clamp(value - errorLimit, 0, 255));
+    bounds.high = Math.min(bounds.high, clamp(value + errorLimit, 0, 255));
+  });
+}
+
 function generateTarget(level) {
   /*
     Create the hidden target for the game.
@@ -245,9 +551,42 @@ function publicPlayers(room) {
     userId: player.userId,
     nickname: player.nickname,
     index,
+    point: Number(player.point) || 0,
+    profile_image: player.profileImage || "profile.png",
     isHost: player.socketId === room.hostSocketId,
-    hasPeeked: room.peekedUsers.has(player.userId)
+    hasPeeked: room.peekedUsers.has(player.userId),
+    isReady: player.isReady || false,
+    disconnected: Boolean(player.disconnected)
   }));
+}
+
+async function loadUserPublicData(userId, fallbackPoint = 0, fallbackProfileImage = "profile.png") {
+  if (!userId || !adminDb) {
+    return {
+      point: Number(fallbackPoint) || 0,
+      profileImage: fallbackProfileImage || "profile.png"
+    };
+  }
+
+  try {
+    const userDoc = await adminDb.collection("User").doc(String(userId)).get();
+    if (!userDoc.exists) {
+      return {
+        point: Number(fallbackPoint) || 0,
+        profileImage: fallbackProfileImage || "profile.png"
+      };
+    }
+    return {
+      point: Number(userDoc.data()?.point) || 0,
+      profileImage: String(userDoc.data()?.profile_image || fallbackProfileImage || "profile.png")
+    };
+  } catch (error) {
+    console.error("Failed to load user public data:", error);
+    return {
+      point: Number(fallbackPoint) || 0,
+      profileImage: fallbackProfileImage || "profile.png"
+    };
+  }
 }
 
 function hostUserId(room) {
@@ -335,11 +674,13 @@ function createRoom(roomCode, hostSocketId, options = {}) {
     currentTurnData: null,
     peekedUsers: new Set(),
     finalSubmissions: new Set(),
+    finalSubmissionCounter: 0,
+    disconnectedUserIds: new Set(),
     timerRef: null
   };
 }
 
-function addOrUpdatePlayer(room, socket, userId, nickname) {
+function addOrUpdatePlayer(room, socket, userId, nickname, point = 0, profileImage = "profile.png") {
   /*
     Add a new player to a waiting room, or update the socket id if the same
     browser joins again before the game starts.
@@ -348,6 +689,8 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
   if (existingPlayer) {
     existingPlayer.socketId = socket.id;
     existingPlayer.nickname = nickname;
+    existingPlayer.point = Number(point) || 0;
+    existingPlayer.profileImage = profileImage || "profile.png";
     return true;
   }
 
@@ -359,8 +702,15 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
     socketId: socket.id,
     userId,
     nickname,
+    point: Number(point) || 0,
+    profileImage: profileImage || "profile.png",
+    isReady: false,
+    disconnected: false,
+    boundaries: createBoundaries(),
     finalGuess: null,
-    finalErrorSum: null
+    finalErrorSum: null,
+    finalSubmitted: false,
+    finalSubmittedOrder: null
   });
   return true;
 }
@@ -368,8 +718,12 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
 function resetPlayerRoundState(room) {
   // Clear final-guess result data before a new game starts.
   room.players.forEach((player) => {
+    player.disconnected = false;
+    player.boundaries = createBoundaries();
     player.finalGuess = null;
     player.finalErrorSum = null;
+    player.finalSubmitted = false;
+    player.finalSubmittedOrder = null;
   });
 }
 
@@ -418,6 +772,61 @@ function startRound(room) {
   startGuessingPhase(room);
 }
 
+function submitTurnGuessForPlayer(room, currentPlayer, cleanGuess, sourceSocket = null) {
+  clearRoomTimer(room);
+
+  const target = room.targetData.average;
+  const errors = errorsFor(target, cleanGuess);
+  const feedback = {
+    r: feedbackTier(target.r, cleanGuess.r),
+    g: feedbackTier(target.g, cleanGuess.g),
+    b: feedbackTier(target.b, cleanGuess.b)
+  };
+
+  tightenPlayerBoundaries(currentPlayer, cleanGuess, feedback);
+
+  room.currentTurnData = {
+    playerId: currentPlayer.userId,
+    guessRGB: cleanGuess,
+    feedback,
+    errors
+  };
+
+  if (sourceSocket) {
+    sourceSocket.emit("my_guess_result", {
+      guessRGB: cleanGuess,
+      feedback,
+      errors
+    });
+  }
+
+  startPeekingPhase(room);
+}
+
+function activePlayerCount(room) {
+  return room.players.filter((player) => !player.disconnected).length;
+}
+
+function autoPeekForDisconnectedPlayers(room) {
+  const guesser = room.players[room.turnIndex];
+  if (!guesser || !room.currentTurnData) return;
+
+  room.players.forEach((player) => {
+    if (!player.disconnected || player.userId === guesser.userId || room.peekedUsers.has(player.userId)) return;
+    const selectedColor = ["r", "g", "b"][Math.floor(Math.random() * 3)];
+    tightenPlayerBoundaries(
+      player,
+      room.currentTurnData.guessRGB,
+      room.currentTurnData.feedback,
+      [selectedColor]
+    );
+    room.peekedUsers.add(player.userId);
+    io.to(room.roomCode).emit("player_peeked", {
+      userId: player.userId
+    });
+  });
+}
+
 function startGuessingPhase(room) {
   /*
     Start the normal guessing phase for the player at room.turnIndex.
@@ -435,6 +844,11 @@ function startGuessingPhase(room) {
   if (!currentPlayer) {
     // If there is no current player, skip to the final guess phase.
     startFinalGuess(room);
+    return;
+  }
+
+  if (currentPlayer.disconnected) {
+    submitTurnGuessForPlayer(room, currentPlayer, midpointGuess(currentPlayer.boundaries));
     return;
   }
 
@@ -484,6 +898,12 @@ function startPeekingPhase(room) {
     timeLimit: CONFIG.PEEK_TIME_MS / 1000
   });
 
+  autoPeekForDisconnectedPlayers(room);
+  if (room.peekedUsers.size >= room.players.length - 1) {
+    room.timerRef = setTimeout(() => advanceTurn(room), 2000);
+    return;
+  }
+
   room.timerRef = setTimeout(() => {
     // If not everyone chooses in time, continue anyway.
     advanceTurn(room);
@@ -530,6 +950,18 @@ function startFinalGuess(room) {
   clearRoomTimer(room);
   room.phase = "FINAL_GUESS";
   room.finalSubmissions = new Set();
+  room.finalSubmissionCounter = 0;
+  room.players.forEach((player) => {
+    if (!player.disconnected) return;
+    const cleanGuess = midpointGuess(player.boundaries);
+    const target = room.targetData.average;
+    const errors = errorsFor(target, cleanGuess);
+    player.finalGuess = cleanGuess;
+    player.finalErrorSum = errors.r + errors.g + errors.b;
+    player.finalSubmitted = true;
+    player.finalSubmittedOrder = room.finalSubmissionCounter += 1;
+    room.finalSubmissions.add(player.userId);
+  });
   emitRoomUpdate(room);
 
   io.to(room.roomCode).emit("final_guess_start", {
@@ -541,39 +973,67 @@ function startFinalGuess(room) {
     // End the game even if some players never submit.
     endGame(room);
   }, CONFIG.FINAL_TIME_MS);
+
+  if (room.finalSubmissions.size >= room.players.length) {
+    endGame(room);
+  }
 }
 
 // 수정 필요함 
-function endGame(room) {
+async function endGame(room) {
   /*
     Calculate final rankings and send results to all players.
 
     The target is the average RGB generated at game start. Lower total RGB error
     is better.
   */
+  if (!room || room.phase === "GAME_OVER") return;
   clearRoomTimer(room);
   room.phase = "GAME_OVER";
   const target = room.targetData.average;
 
   room.players.forEach((player) => {
-    if (!player.finalGuess) {
-      // If a player did not submit, give them a default guess and score it.
-      player.finalGuess = { r: 0, g: 0, b: 0 };
-      player.finalErrorSum = Math.abs(target.r) + Math.abs(target.g) + Math.abs(target.b);
+    if (!player.finalSubmitted) {
+      // Players who never submitted are kept in the ranking but always placed last.
+      player.finalGuess = null;
+      player.finalErrorSum = Number.MAX_SAFE_INTEGER;
+      player.finalSubmittedOrder = Number.MAX_SAFE_INTEGER;
     }
   });
 
-  // Sort a copy so room.players itself is not rearranged.
-  const sortedPlayers = [...room.players].sort((a, b) => a.finalErrorSum - b.finalErrorSum);
+  // Sort connected players only. Disconnected players are not included in final ranking.
+  const sortedPlayers = room.players
+    .filter((player) => !player.disconnected)
+    .sort((a, b) => {
+      if (a.finalSubmitted !== b.finalSubmitted) return a.finalSubmitted ? -1 : 1;
+      if (a.finalErrorSum !== b.finalErrorSum) return a.finalErrorSum - b.finalErrorSum;
+      return (a.finalSubmittedOrder ?? Number.MAX_SAFE_INTEGER) - (b.finalSubmittedOrder ?? Number.MAX_SAFE_INTEGER);
+    });
   const pointArray = CONFIG.POINTS[sortedPlayers.length] || [];
   const results = sortedPlayers.map((player, index) => ({
     userId: player.userId,
     nickname: player.nickname,
+    profile_image: player.profileImage || "profile.png",
     rank: index + 1,
     earnedPoint: pointArray[index] || 0,
-    finalError: player.finalErrorSum,
-    finalGuess: player.finalGuess
+    finalError: player.finalSubmitted ? player.finalErrorSum : null,
+    finalGuess: player.finalSubmitted ? player.finalGuess : null,
+    submittedFinalGuess: player.finalSubmitted,
+    finalSubmittedOrder: player.finalSubmittedOrder ?? null
   }));
+
+  if (adminDb) {
+    await Promise.all(results.map(async (result) => {
+      if (!result.userId || result.userId.startsWith("preview_")) return;
+      try {
+        await adminDb.collection("User").doc(result.userId).update({
+          point: FieldValue.increment(result.earnedPoint)
+        });
+      } catch (error) {
+        console.error("RP update failed:", error);
+      }
+    }));
+  }
 
   io.to(room.roomCode).emit("game_over", {
     targetRgb: target,
@@ -592,6 +1052,46 @@ function removeSocketFromRoom(socket, room, notifyLeavingSocket = false) {
   */
   const index = room.players.findIndex((player) => player.socketId === socket.id);
   if (index === -1) return false;
+
+  if (room.phase !== "WAITING") {
+    const player = room.players[index];
+    player.disconnected = true;
+    player.socketId = null;
+    room.disconnectedUserIds.add(player.userId);
+    socket.leave(room.roomCode);
+
+    if (activePlayerCount(room) === 0) {
+      clearRoomTimer(room);
+      activeRooms.delete(room.roomCode);
+      emitRoomList();
+      return true;
+    }
+
+    emitRoomUpdate(room);
+    if (room.phase === "GUESSING" && room.turnIndex === index) {
+      submitTurnGuessForPlayer(room, player, midpointGuess(player.boundaries));
+    } else if (room.phase === "PEEKING") {
+      autoPeekForDisconnectedPlayers(room);
+      if (room.peekedUsers.size >= room.players.length - 1) {
+        clearRoomTimer(room);
+        room.timerRef = setTimeout(() => advanceTurn(room), 2000);
+      }
+    } else if (room.phase === "FINAL_GUESS") {
+      const cleanGuess = midpointGuess(player.boundaries);
+      const target = room.targetData.average;
+      const errors = errorsFor(target, cleanGuess);
+      player.finalGuess = cleanGuess;
+      player.finalErrorSum = errors.r + errors.g + errors.b;
+      player.finalSubmitted = true;
+      player.finalSubmittedOrder = room.finalSubmissionCounter += 1;
+      room.finalSubmissions.add(player.userId);
+      if (room.finalSubmissions.size >= room.players.length) {
+        endGame(room);
+      }
+    }
+
+    return true;
+  }
 
   const wasCurrentTurn = index === room.turnIndex;
   room.players.splice(index, 1);
@@ -640,7 +1140,35 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("create_room", ({ roomName, roomCode, level, maxPlayers, userId, nickname }) => {
+  socket.on("validate_join_room", ({ roomCode, privateCode }, respond = () => {}) => {
+    /*
+      Lightweight join pre-check used by the lobby before moving to game.html.
+      This validates room existence, state, capacity, and private-room code
+      without actually adding the player to the room yet.
+    */
+    const cleanRoomCode = normalizeRoomCode(roomCode);
+    const room = activeRooms.get(cleanRoomCode);
+    if (!room) {
+      respond({ ok: false, message: "방을 찾을 수 없습니다." });
+      return;
+    }
+    if (room.phase !== "WAITING") {
+      respond({ ok: false, message: "게임이 이미 시작되었습니다." });
+      return;
+    }
+    if (room.isPrivate && normalizeOptionalRoomCode(privateCode) !== room.joinCode) {
+      respond({ ok: false, message: "올바르지 않은 방 코드입니다." });
+      return;
+    }
+    if (room.players.length >= room.maxPlayers) {
+      respond({ ok: false, message: "방 인원이 다 찼습니다." });
+      return;
+    }
+
+    respond({ ok: true });
+  });
+
+  socket.on("create_room", async ({ roomName, roomCode, level, maxPlayers, userId, nickname, point, profileImage }) => {
     /*
       create_room is sent from the create-room popup.
       The creator is automatically added to the new waiting room and becomes host.
@@ -658,13 +1186,14 @@ io.on("connection", (socket) => {
     });
 
     activeRooms.set(generatedRoomCode, room);
-    addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname);
+    const userPublicData = await loadUserPublicData(cleanUserId, point, profileImage);
+    addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, userPublicData.point, userPublicData.profileImage);
     socket.join(generatedRoomCode);
     emitRoomUpdate(room);
     emitRoomList();
   });
 
-  socket.on("join_room", ({ roomCode, privateCode, userId, nickname }) => {
+  socket.on("join_room", async ({ roomCode, privateCode, userId, nickname, point, profileImage }) => {
     /*
       join_room is sent from the lobby.
 
@@ -678,19 +1207,20 @@ io.on("connection", (socket) => {
 
     const room = activeRooms.get(cleanRoomCode);
     if (!room) {
-      sendError(socket, "Room not found.");
+      sendError(socket, "방을 찾을 수 없습니다.");
       return;
     }
     if (room.phase !== "WAITING") {
-      sendError(socket, "This room already started.");
+      sendError(socket, "게임이 이미 시작되었습니다.");
       return;
     }
     if (room.isPrivate && normalizeOptionalRoomCode(privateCode) !== room.joinCode) {
-      sendError(socket, "Incorrect room code.");
+      sendError(socket, "올바르지 않은 방 코드입니다.");
       return;
     }
-    if (!addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname)) {
-      sendError(socket, "This room is full.");
+    const userPublicData = await loadUserPublicData(cleanUserId, point, profileImage);
+    if (!addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, userPublicData.point, userPublicData.profileImage)) {
+      sendError(socket, "방 인원이 다 찼습니다.");
       return;
     }
 
@@ -719,6 +1249,22 @@ io.on("connection", (socket) => {
     removeSocketFromRoom(socket, room, true);
   });
 
+  socket.on("toggle_ready", ({ roomCode }) => {
+    // 1. 방을 찾고 상태가 대기 중(WAITING)인지 확인
+    const room = activeRooms.get(normalizeRoomCode(roomCode));
+    if (!room || room.phase !== "WAITING") return;
+
+    // 2. 이벤트를 보낸 플레이어 찾기
+    const player = room.players.find((p) => p.socketId === socket.id);
+    if (!player) return;
+
+    // 3. 준비 상태 반전 (true -> false / false -> true)
+    player.isReady = !player.isReady;
+
+    // 4. 방에 있는 모든 사람에게 업데이트된 정보 전송
+    emitRoomUpdate(room);
+  });
+
   socket.on("start_game", ({ roomCode, level }) => {
     /*
       start_game is sent when the host clicks Start Game.
@@ -741,6 +1287,10 @@ io.on("connection", (socket) => {
     }
     if (room.players.length < CONFIG.MIN_PLAYERS_TO_START) {
       sendError(socket, `Need at least ${CONFIG.MIN_PLAYERS_TO_START} player(s).`);
+      return;
+    }
+    if (!room.players.every((player) => player.isReady)) {
+      sendError(socket, "All players must be ready before starting.");
       return;
     }
 
@@ -766,34 +1316,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // A valid guess ends the guessing timer immediately.
-    clearRoomTimer(room);
-
-    // Compare the submitted guess to the hidden average target.
-    const target = room.targetData.average;
-    const errors = errorsFor(target, cleanGuess);
-    const feedback = {
-      r: feedbackTier(target.r, cleanGuess.r),
-      g: feedbackTier(target.g, cleanGuess.g),
-      b: feedbackTier(target.b, cleanGuess.b)
-    };
-
-    room.currentTurnData = {
-      // Store this turn's guess so other players can peek one channel.
-      playerId: currentPlayer.userId,
-      guessRGB: cleanGuess,
-      feedback,
-      errors
-    };
-
-    // Only the guessing player receives full feedback for all channels.
-    socket.emit("my_guess_result", {
-      guessRGB: cleanGuess,
-      feedback,
-      errors
-    });
-
-    startPeekingPhase(room);
+    submitTurnGuessForPlayer(room, currentPlayer, cleanGuess, socket);
   });
 
   socket.on("peek_color", ({ roomCode, selectedColor }) => {
@@ -813,6 +1336,13 @@ io.on("connection", (socket) => {
 
     const channel = String(selectedColor || "").toLowerCase();
     if (!["r", "g", "b"].includes(channel)) return;
+
+    tightenPlayerBoundaries(
+      peekingPlayer,
+      room.currentTurnData.guessRGB,
+      room.currentTurnData.feedback,
+      [channel]
+    );
 
     // Track by stable user id so the UI can show a check mark by player.
     room.peekedUsers.add(peekingPlayer.userId);
@@ -848,7 +1378,7 @@ io.on("connection", (socket) => {
     if (!room || room.phase !== "FINAL_GUESS") return;
 
     const player = room.players.find((candidate) => candidate.socketId === socket.id);
-    if (!player || room.finalSubmissions.has(socket.id)) return;
+    if (!player || room.finalSubmissions.has(player.userId)) return;
 
     const cleanGuess = sanitizeRgb(guessRGB);
     if (!cleanGuess) {
@@ -860,9 +1390,10 @@ io.on("connection", (socket) => {
     const errors = errorsFor(target, cleanGuess);
     player.finalGuess = cleanGuess;
     player.finalErrorSum = errors.r + errors.g + errors.b;
+    player.finalSubmitted = true;
+    player.finalSubmittedOrder = room.finalSubmissionCounter += 1;
 
-    // Track socket ids here because each currently connected browser submits once.
-    room.finalSubmissions.add(socket.id);
+    room.finalSubmissions.add(player.userId);
 
     // Confirm to this browser that the server accepted its final answer.
     socket.emit("final_guess_received");
@@ -889,7 +1420,8 @@ io.on("connection", (socket) => {
 
 const PORT = Number(process.env.PORT) || 3000;
 
-server.listen(PORT, () => {
-  // Start listening for browser requests and socket connections.
+server.listen(PORT, "0.0.0.0", () => {
+  // 0.0.0.0 allows other devices on the same network to connect to this server.
   console.log(`RGB Guess server running at http://localhost:${PORT}`);
+  console.log(`Same-network devices can connect with http://YOUR_PC_IPV4:${PORT}`);
 });
