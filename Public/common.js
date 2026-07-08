@@ -108,6 +108,12 @@ function setProfileImage(element, profileImage) {
   element.classList.toggle("is-default-profile", isDefaultProfileImage(profileImage));
 }
 
+function profileImageHtml(className, profileImage, alt = "", extraAttributes = "") {
+  const defaultClass = isDefaultProfileImage(profileImage) ? " is-default-profile" : "";
+  const attributes = extraAttributes ? ` ${extraAttributes}` : "";
+  return `<img class="${escapeHtml(`${className}${defaultClass}`)}" src="${escapeHtml(normalizeProfileImage(profileImage))}" alt="${escapeHtml(alt)}"${attributes} />`;
+}
+
 function normalizeLoggedInUser(user) {
   /*
     login.js saves the real Firebase/Firestore user in sessionStorage.
@@ -169,7 +175,9 @@ async function updateCurrentUserPresence(online) {
 }
 
 function refreshVisibleFriendPresence() {
-  if (roomClient.lobbyView !== "friends" || !isLobbyPhase()) return;
+  const friendsPageVisible = roomClient.lobbyView === "friends" && isLobbyPhase();
+  const invitePopupVisible = els.inviteFriendLayer && !els.inviteFriendLayer.hidden;
+  if (!friendsPageVisible && !invitePopupVisible) return;
   loadFriendsFromDb(true);
 }
 
@@ -215,6 +223,12 @@ const mockCurrentUser = currentUserFromSession || {
 
 const localUserId = mockCurrentUser.id;
 sessionStorage.setItem("colorMasterUserId", localUserId);
+
+function isGuestUser() {
+  return mockCurrentUser.loginType === "guest" || Boolean(mockCurrentUser.isGuest);
+}
+
+document.body?.classList.toggle("is-guest-user", isGuestUser());
 
 function createMockProfileImage(nickname, hue) {
   /*
@@ -696,6 +710,32 @@ function setLobbyStatus(message) {
   els.lobbyStatus.textContent = message;
 }
 
+function applyGuestUiState() {
+  const guest = isGuestUser();
+  document.body?.classList.toggle("is-guest-user", guest);
+
+  [
+    els.leaderBoardsButton,
+    els.friendsButton,
+    els.mailboxButton,
+    els.openCreateRoomButton
+  ].forEach((button) => {
+    if (!button) return;
+    button.disabled = guest;
+    button.setAttribute("aria-disabled", String(guest));
+  });
+
+  [
+    els.lobbyUserInfoButton,
+    els.rankingUserInfoButton,
+    els.friendsUserInfoButton
+  ].forEach((button) => {
+    if (!button) return;
+    button.disabled = guest;
+    button.setAttribute("aria-disabled", String(guest));
+  });
+}
+
 function renderLobbyUser() {
   // Paint the temporary logged-in user box from mock data.
   setProfileImage(els.lobbyProfileImage, mockCurrentUser.profileImage);
@@ -825,7 +865,7 @@ function renderRoomList() {
       return `
         <div class="room-row">
           <span>${index + 1}</span>
-          <span class="room-name">${escapeHtml(room.roomName)}${room.isPrivate ? `<img class="room-private-icon" src="/Images/lock.png" alt="비공개" />` : ""}</span>
+          <span class="room-name">${escapeHtml(room.roomName)}${room.isPrivate ? `<img class="room-private-icon" src="/Images/lock_icon.png" alt="비공개" />` : ""}</span>
           <span>${roomLevelLabel(room.level)}</span>
           <span>${room.playerCount}/${room.maxPlayers}</span>
           <button class="room-join-button" type="button" data-join-room="${escapeHtml(room.roomCode)}" data-private="${room.isPrivate ? "true" : "false"}" ${isFull ? "disabled" : ""}>참여</button>
@@ -902,7 +942,7 @@ function renderRankingTable() {
     .map((user, index) => `
       <tr class="${user.id === mockCurrentUser.id ? "is-me" : ""}">
         <td>${index + 1}</td>
-        <td><img class="ranking-profile-image" src="${normalizeProfileImage(user.profileImage)}" alt="" /></td>
+        <td>${profileImageHtml("ranking-profile-image", user.profileImage)}</td>
         <td>${escapeHtml(user.nickname)}</td>
         <td>${Number(user.rankingPoint) || 0} RP</td>
       </tr>
@@ -1024,7 +1064,7 @@ function renderFriendsTable() {
     return `
       <tr>
         <td>${index + 1}</td>
-        <td><img class="friends-profile-image" src="${friend.profileImage}" alt="" /></td>
+        <td>${profileImageHtml("friends-profile-image", friend.profileImage)}</td>
         <td>${escapeHtml(friend.nickname)}</td>
         <td>${friend.rankingPoint} RP</td>
         <td>
@@ -1060,8 +1100,8 @@ function renderMailboxNotices() {
 
   els.mailboxNoticeList.innerHTML = mockMailboxNotices.map((notice) => {
     const message = notice.type === "invite"
-      ? `"${notice.sender}"이 게임으로 초대했습니다.`
-      : `"${notice.sender}"이 친구 신청을 보냈습니다.`;
+      ? `"${notice.sender}"님이 게임으로 초대했습니다.`
+      : `"${notice.sender}"님이 친구 신청을 보냈습니다.`;
     return `
       <div class="mailbox-notice-row">
         <button class="mailbox-message-button" type="button" data-mailbox-open="${escapeHtml(notice.id)}">
@@ -1098,7 +1138,7 @@ function renderInviteFriendList() {
   els.inviteFriendTableBody.innerHTML = onlineFriends.map((friend, index) => `
     <tr>
       <td>${index + 1}</td>
-      <td><img class="invite-friend-profile-image" src="${friend.profileImage}" alt="" /></td>
+      <td>${profileImageHtml("invite-friend-profile-image", friend.profileImage)}</td>
       <td>${escapeHtml(friend.nickname)}</td>
       <td><button class="invite-friend-button" type="button" data-send-game-invite="${escapeHtml(friend.id)}">Invite</button></td>
     </tr>
@@ -1112,7 +1152,7 @@ function renderInviteFriendList() {
 function openInviteFriendModal() {
   // Show online friends after the user clicks an empty waiting-room slot.
   if (!els.inviteFriendLayer) return;
-  loadFriendsFromDb();
+  loadFriendsFromDb(true);
   renderInviteFriendList();
   els.inviteFriendLayer.hidden = false;
   if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "Choose an online friend to invite.";
@@ -1253,9 +1293,15 @@ function renderLobby() {
   // els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 2;
   // const privateMark = roomClient.isPrivate ? " (P)" : "";
   // els.waitingRoomTitle.textContent = `${roomClient.roomName || "Waiting Room"}${privateMark}`;
-  const privateMark = roomClient.isPrivate ? `<img class="room-private-icon" src="/Images/lock.png" alt="비공개" />` : "";
-  els.waitingRoomTitle.innerHTML = `${escapeHtml(roomClient.roomName || "Waiting Room")}${privateMark}`;
-  els.waitingRoomMeta.textContent = `${roomLevelLabel(roomClient.level)}`; // <-- 변경됨
+  const privateMark = roomClient.isPrivate ? `<img class="room-private-icon" src="/Images/lock_icon.png" alt="비공개" />` : "";
+  const levelLabel = roomLevelLabel(roomClient.level);
+  els.waitingRoomTitle.innerHTML = `
+    <span class="waiting-room-name">${escapeHtml(roomClient.roomName || "Waiting Room")}${privateMark}</span>
+    <span class="waiting-room-divider" aria-hidden="true"></span>
+    <span class="waiting-room-level">${escapeHtml(levelLabel)}</span>
+  `;
+  els.waitingRoomMeta.textContent = "";
+  els.waitingRoomMeta.hidden = true;
 
   els.startGameButton.hidden = !isHost;
   els.startGameButton.disabled = !roomClient.joined || !isHost || game.players.length < 2;
@@ -1268,7 +1314,8 @@ function renderLobby() {
     const isMe = player.id === game.localPlayerId;
     const isReady = player.isReady;
     const statusText = isReady ? "준비 완료" : "준비중";
-    const crown = player.isHost ? " 👑" : "";
+    // const hostLabel = player.isHost ? `<img class="room-crown-icon" src="/Images/crown_icon.png" alt="방장" />` : "";
+    const hostLabel = player.isHost ? `<span class="waiting-player-badge">방장</span>` : "";
 
     let statusHtml;
     if (isMe) {
@@ -1287,8 +1334,8 @@ function renderLobby() {
     return `
       <tr class="${isMe ? "is-me" : ""}">
         <td>${index + 1}</td>
-        <td><img class="players-profile-image" src="${normalizeProfileImage(player.profileImage)}" alt="" style="width: 40px; height: 40px; border-radius: 8px;" /></td>
-        <td>${escapeHtml(player.name)}${crown}</td>
+        <td>${profileImageHtml("players-profile-image", player.profileImage)}</td>
+        <td>${escapeHtml(player.name)}${hostLabel}</td>
         <td>${player.rankingPoint} RP</td>
         <td>
           <div class="friend-status-cell">
@@ -1594,7 +1641,7 @@ function resultTableRows() {
       return `
       <tr class="${result.userId === game.localPlayerId ? "is-me" : ""}">
         <td>${index + 1}</td>
-        <td><img class="result-profile-image" src="${profileImg}" alt="" /></td>
+        <td>${profileImageHtml("result-profile-image", profileImg)}</td>
         <td>${escapeHtml(result.nickname || "Player")}</td>
         <td>${escapeHtml(finalGuessText(result.finalGuess))}</td>
         <td style="color: ${earned > 0 ? '#31e981' : (earned < 0 ? '#ff4c64' : '#e9edff')}; font-weight: 950;">${displayRp} RP</td>
@@ -1830,6 +1877,10 @@ function currentNickname() {
 
 function openCreateRoomModal() {
   // Show the create-room popup and provide a friendly default room name.
+  if (isGuestUser()) {
+    setLobbyStatus("Guest users cannot create rooms.");
+    return;
+  }
   if (!els.createRoomLayer) return;
   els.createRoomNameInput.value = `${currentNickname()}'s room`;
   els.createRoomCodeInput.value = "";
@@ -1922,6 +1973,12 @@ function createRoomFromLobby() {
     A blank room code creates a public room. A non-blank room code creates a
     private room that other users must enter before joining.
   */
+  if (isGuestUser()) {
+    closeCreateRoomModal();
+    setLobbyStatus("Guest users cannot create rooms.");
+    return;
+  }
+
   if (!socket) {
     setLobbyStatus("Open this page through the Node server to use rooms.");
     return;
@@ -2059,6 +2116,7 @@ function resetToMainLobby(message = "") {
 
 function showRankingPage() {
   // Navigate from the room lobby to the ranking page.
+  if (isGuestUser()) return;
   roomClient.lobbyView = "ranking";
   rankingMode = "all";
   game.phase = "lobby";
@@ -2068,6 +2126,7 @@ function showRankingPage() {
 
 function showFriendsPage() {
   // Navigate from the room lobby or ranking page to the friends page.
+  if (isGuestUser()) return;
   roomClient.lobbyView = "friends";
   game.phase = "lobby";
   render();
@@ -2077,6 +2136,7 @@ function showFriendsPage() {
 
 function openMailboxModal() {
   // Show the mailbox as a popup on top of the current lobby-style page.
+  if (isGuestUser()) return;
   if (!els.mailboxLayer) return;
   closeProfileMenus();
   renderMailboxNotices();
@@ -2202,6 +2262,10 @@ function renderUserInfoPopup() {
 
 function openUserInfoModal() {
   // Show the user-info popup from the profile action menu.
+  if (isGuestUser()) {
+    closeProfileMenus();
+    return;
+  }
   if (!els.userInfoLayer) return;
   closeProfileMenus();
   renderUserInfoPopup();
@@ -2508,7 +2572,7 @@ function openMailboxDetail(noticeId) {
 
   els.mailboxDetailContent.innerHTML = `
     <div class="mailbox-detail-user">
-      <img class="mailbox-detail-profile" src="${notice.profileImage}" alt="" />
+      ${profileImageHtml("mailbox-detail-profile", notice.profileImage)}
       <div class="mailbox-detail-user-text">
         <div class="mailbox-detail-name">${escapeHtml(notice.sender)}</div>
         <div class="mailbox-detail-rp">${notice.rankingPoint} RP</div>
@@ -2552,6 +2616,7 @@ async function handleMailboxResponse(noticeId, response) {
         ];
         friendsLoaded = true;
         renderFriendsTable();
+        if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) renderInviteFriendList();
       } else {
         await actions.rejectFriendRequest(mockCurrentUser.id, notice.id);
       }
@@ -2959,6 +3024,7 @@ function handleGameOver(data) {
   These listeners connect user actions in the browser to the functions above.
   addEventListener("click", fn) means "run fn when this element is clicked."
 */
+applyGuestUiState();
 renderLobbyUser();
 updateMailboxUnreadDots();
 els.openCreateRoomButton.addEventListener("click", openCreateRoomModal);

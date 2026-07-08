@@ -437,6 +437,11 @@ body.is-guest-user .main-lobby-panel .lobby-room-heading {
   display: none;
 }
 
+body.is-guest-user .main-lobby-panel .lobby-room-panel {
+  grid-template-rows: 1fr;
+  gap: 0;
+}
+
 .lobby-status-hidden {
   position: absolute;
   width: 1px;
@@ -647,6 +652,12 @@ body.is-guest-user .main-lobby-panel .lobby-room-heading {
   object-fit: cover;
   background: rgba(255,255,255,0.08);
   /* transform: translate(7px, 0px); */
+}
+
+.ranking-profile-image.is-default-profile,
+.friends-profile-image.is-default-profile {
+  padding: 5px;
+  object-fit: contain;
 }
 
 /* 친구 목록의 온라인/오프라인 상태 표시 영역이다. */
@@ -1425,6 +1436,11 @@ body.is-guest-user .main-lobby-panel .lobby-room-heading {
   border-radius: 8px;
   object-fit: cover;
   background: rgba(255,255,255,0.08);
+}
+
+.mailbox-detail-profile.is-default-profile {
+  padding: 5px;
+  object-fit: contain;
 }
 
 .mailbox-detail-user-text {

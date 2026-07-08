@@ -48,6 +48,7 @@
 }
 
 .waiting-room-meta {
+  display: none;
   min-height: auto;
   margin: 0;
   color: var(--muted);
@@ -58,15 +59,35 @@
 .waiting-lobby-panel {
   position: relative;
   display: grid;
-  gap: 14px;
+  gap: 0px;
   height: 90%;
 }
 
 .waiting-room-info .game-section-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   margin: 0;
   color: var(--ink);
   font-size: 30px;
   font-weight: 950;
+}
+
+.waiting-room-name {
+  display: inline-flex;
+  align-items: center;
+}
+
+.waiting-room-divider {
+  width: 3px;
+  height: 28px;
+  background: rgba(232, 238, 255, 0.65);
+}
+
+.waiting-room-level {
+  color: var(--muted);
+  font-size: 26px;
+  font-weight: 850;
 }
 
 .waiting-header,
@@ -80,7 +101,7 @@
 .waiting-header{
   width: 100%;
   max-width: 937px;
-  margin: 60px auto 20px auto; /* 위아래 여백과 가운데 정렬 */
+  margin: 60px auto 10px auto; /* 위아래 여백과 가운데 정렬 */
   display: flex;
   align-items: center;
 }
@@ -249,6 +270,11 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.players-profile-image.is-default-profile {
+  padding: 5px;
+  object-fit: contain;
+}
+
 /* 준비 상태 텍스트 + 점(Dot) 영역 */
 .friend-status {
   display: inline-flex;
@@ -293,7 +319,7 @@
   min-width: 90px;
   padding: 6px 12px;
   border-radius: 8px;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 850;
   cursor: pointer;
   border: 1px solid transparent;
@@ -385,7 +411,7 @@
   border-radius: 8px;
   background: rgba(124, 247, 255, 0.10);
   color: #dffcff;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 900;
 }
 
@@ -394,11 +420,17 @@
 }
 
 .waiting-player-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border: 1px solid rgba(124, 247, 255, 0.7);
+  border-radius: 5px;
+  background: rgba(124, 247, 255, 0.08);
   color: #7cf7ff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 950;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  line-height: 1.2;
+  transform: translate(0px, -3px);
 }
 
 .invite-friend-layer {
@@ -424,9 +456,10 @@
   box-shadow: var(--shadow);
 }
 
-.invite-friend-close-button {
-  width: 38px;
-  height: 38px;
+.invite-friend-close-button,
+.choice-close-button {
+  width: 25px;
+  height: 25px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -434,13 +467,15 @@
   background: transparent;
 }
 
-.invite-friend-close-button:hover {
+.invite-friend-close-button:hover,
+.choice-close-button:hover {
   opacity: 0.72;
 }
 
-.invite-friend-close-icon {
-  width: 30px;
-  height: 30px;
+.invite-friend-close-icon,
+.choice-close-icon {
+  width: 25px;
+  height: 25px;
   display: block;
   object-fit: contain;
 }
@@ -487,10 +522,16 @@
   width: 38px;
   height: 38px;
   display: block;
+  margin: 0 auto;
   border: 1px solid rgba(255,255,255,0.22);
   border-radius: 8px;
   object-fit: cover;
   background: rgba(255,255,255,0.08);
+}
+
+.invite-friend-profile-image.is-default-profile {
+  padding: 5px;
+  object-fit: contain;
 }
 
 .invite-friend-button {
@@ -1348,19 +1389,19 @@ input.value-box:focus {
 }
 
 .popup-close,
-.choice-close {
+.choice-close-button {
   position: absolute;
   top: 12px;
   right: 14px;
-  width: 32px;
-  height: 32px;
+  width: 25px;
+  height: 25px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  /* border-radius: 12px;
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.76);
   font-size: 22px;
-  line-height: 1;
+  line-height: 1; */
 }
 
 .choice-layer,
@@ -1779,7 +1820,7 @@ input.value-box:focus {
   height: 35px;
   padding: 0;
   border-radius: 0;
-  background: transparent url("/Images/close_icon.png") center / 34px 34px no-repeat;
+  background: transparent url("/Images/close_icon.png") center / 25px 25px no-repeat;
   box-shadow: none;
   color: transparent;
   font-size: 0;
@@ -1788,7 +1829,8 @@ input.value-box:focus {
 }
 
 /* 비공개 방 자물쇠 아이콘 스타일 */
-.room-private-icon {
+.room-private-icon,
+.room-crown-icon {
   width: 18px;         /* 글자 크기에 맞게 조절 (방 제목 크기가 크면 22px 등으로 키우셔도 됩니다) */
   height: 18px;
   margin-left: 8px;    /* 텍스트와 아이콘 사이 간격 */
