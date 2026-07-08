@@ -186,14 +186,14 @@ function sendGuestLogoutBeacon() {
   const payload = JSON.stringify({ userId: mockCurrentUser.id });
   const url = `/api/guest-logout?userId=${encodeURIComponent(mockCurrentUser.id)}`;
   if (navigator.sendBeacon) {
-    const body = new Blob([payload], { type: "application/json" });
+    const body = new Blob([payload], { type: "text/plain" }); 
     navigator.sendBeacon(url, body);
     return;
   }
   fetch(url, {
     method: "POST",
     body: payload,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "text/plain" },
     keepalive: true
   }).catch(() => {});
 }
