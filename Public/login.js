@@ -8,7 +8,9 @@ import {
   signInWithPopup,
   signInAnonymously,
   deleteUser,
-  signOut
+  signOut,
+  updateEmail,
+  updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import {
@@ -273,7 +275,9 @@ function friendFromUserDoc(userId, userData = {}, fallbackData = {}) {
     id: userId,
     nickname: userData.nickname || fallbackData.nickname || "Player",
     rankingPoint: Number(userData.point ?? userData.rankingPoint ?? fallbackData.point ?? fallbackData.rankingPoint) || 0,
-    profileImage: normalizeProfileImage(userData.profile_image || userData.profileImage || fallbackData.profileImage),
+    profileImage: normalizeProfileImage(
+      userData.profile_image || userData.profileImage || fallbackData.profile_image || fallbackData.profileImage
+    ),
     online: Boolean(userData.online) && recentlyActive
   };
 }
@@ -300,6 +304,20 @@ export async function getLeaderboardUsers(maxUsers = 50) {
   return leaderboardSnapshot.docs
     .map(leaderboardUserFromDoc)
     .filter(Boolean);
+}
+
+export async function getCurrentUserProfile(userId) {
+  const cleanUserId = String(userId || "").trim();
+  if (!cleanUserId) return null;
+
+  const userDocRef = doc(db, "User", cleanUserId);
+  const userDocSnap = await getDoc(userDocRef);
+  if (!userDocSnap.exists()) return null;
+
+  return {
+    id: cleanUserId,
+    ...userDocSnap.data()
+  };
 }
 
 export async function setUserPresence(userId, online) {
@@ -331,25 +349,48 @@ export async function getFriends(userId) {
   return friends;
 }
 
-function mailboxNoticeFromDoc(noticeDoc) {
+async function mailboxNoticeFromDoc(noticeDoc) {
   const data = noticeDoc.data();
-  const sender = data.sender || data.nickname || "Player";
   const createdAt = data.createdAt?.toMillis?.() || Number(data.createdAt) || Date.now();
   const type = data.type === "invite" ? "invite" : "friend";
+  const senderId = String(data.senderId || "").trim();
+  let senderUserData = {};
+
+  if (senderId) {
+    try {
+      const senderUserDoc = await getDoc(doc(db, "User", senderId));
+      if (senderUserDoc.exists()) senderUserData = senderUserDoc.data();
+    } catch (_error) {
+      // If the sender profile cannot be loaded, fall back to any older fields.
+    }
+  }
+
+  const senderInfo = friendFromUserDoc(senderId, senderUserData, data);
+  const sender = senderInfo.nickname || "Player";
+  const roomData = data.room || null;
+  const room = roomData ? {
+    roomCode: String(roomData.roomCode || "").trim().toUpperCase(),
+    privateCode: String(roomData.privateCode || "").trim(),
+    isPrivate: Boolean(roomData.isPrivate),
+    name: String(roomData.name || "Waiting Room").trim(),
+    level: Number(roomData.level) || 1,
+    maxPlayers: Number(roomData.maxPlayers) || 1
+  } : null;
 
   return {
     id: noticeDoc.id,
+    readKey: `${noticeDoc.id}:${createdAt}`,
     type,
     source: "db",
-    senderId: data.senderId || "",
+    senderId,
     sender,
     createdAt,
-    profileImage: normalizeProfileImage(data.profileImage || data.profile_image),
-    rankingPoint: Number(data.point ?? data.rankingPoint) || 0,
-    message: data.message || (type === "friend"
+    profileImage: senderInfo.profileImage,
+    rankingPoint: senderInfo.rankingPoint,
+    message: (type === "friend"
       ? `"${sender}" has sent you a friend request.`
       : `"${sender}" has invited you to a game.`),
-    room: data.room || null
+    room
   };
 }
 
@@ -358,9 +399,8 @@ export async function getMailboxNotices(userId) {
   if (!cleanUserId) return [];
 
   const noticesSnapshot = await getDocs(collection(db, "User", cleanUserId, "Mailbox"));
-  return noticesSnapshot.docs
-    .map(mailboxNoticeFromDoc)
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const notices = await Promise.all(noticesSnapshot.docs.map(mailboxNoticeFromDoc));
+  return notices.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export async function sendFriendRequestByNickname(userId, friendNickname) {
@@ -380,10 +420,6 @@ export async function sendFriendRequestByNickname(userId, friendNickname) {
   const existingFriendDoc = await getDoc(doc(db, "User", cleanUserId, "Friends", friendUserId));
   if (existingFriendDoc.exists()) throw new Error("This user is already your friend.");
 
-  const currentUserDoc = await getDoc(doc(db, "User", cleanUserId));
-  if (!currentUserDoc.exists()) throw new Error("Current user data was not found.");
-
-  const currentUser = friendFromUserDoc(cleanUserId, currentUserDoc.data());
   const friend = friendFromUserDoc(friendUserId, friendUserDoc.data());
   const requestId = `friend_request_${cleanUserId}`;
   const requestDocRef = doc(db, "User", friendUserId, "Mailbox", requestId);
@@ -393,10 +429,6 @@ export async function sendFriendRequestByNickname(userId, friendNickname) {
   await setDoc(requestDocRef, {
     type: "friend",
     senderId: cleanUserId,
-    sender: currentUser.nickname,
-    profileImage: currentUser.profileImage,
-    point: currentUser.rankingPoint,
-    message: `"${currentUser.nickname}" has sent you a friend request.`,
     createdAt: serverTimestamp()
   });
 
@@ -435,7 +467,7 @@ export async function acceptFriendRequest(userId, requestId) {
       fd_id: senderId,
       nickname: senderUser.nickname,
       point: senderUser.rankingPoint,
-      profileImage: senderUser.profileImage,
+      profile_image: senderUser.profileImage,
       createdAt: serverTimestamp()
     }, { merge: true }),
     setDoc(doc(db, "User", senderId, "Friends", cleanUserId), {
@@ -443,7 +475,7 @@ export async function acceptFriendRequest(userId, requestId) {
       fd_id: cleanUserId,
       nickname: currentUser.nickname,
       point: currentUser.rankingPoint,
-      profileImage: currentUser.profileImage,
+      profile_image: currentUser.profileImage,
       createdAt: serverTimestamp()
     }, { merge: true }),
     deleteDoc(requestDocRef)
@@ -478,7 +510,6 @@ export async function sendGameInvite(userId, friendUserId, roomInfo = {}) {
   const friendDoc = await getDoc(doc(db, "User", cleanUserId, "Friends", cleanFriendUserId));
   if (!friendDoc.exists()) throw new Error("You can only invite users on your friends list.");
 
-  const currentUser = friendFromUserDoc(cleanUserId, currentUserDoc.data());
   const inviteId = `game_invite_${cleanRoomCode}_${cleanUserId}`;
   const inviteDocRef = doc(db, "User", cleanFriendUserId, "Mailbox", inviteId);
   const existingInviteDoc = await getDoc(inviteDocRef);
@@ -490,22 +521,40 @@ export async function sendGameInvite(userId, friendUserId, roomInfo = {}) {
     isPrivate: Boolean(roomInfo.isPrivate),
     name: String(roomInfo.name || "Waiting Room").trim(),
     level: Number(roomInfo.level) || 1,
-    currentPlayers: Number(roomInfo.currentPlayers) || 1,
     maxPlayers: Number(roomInfo.maxPlayers) || 5
   };
 
   await setDoc(inviteDocRef, {
     type: "invite",
     senderId: cleanUserId,
-    sender: currentUser.nickname,
-    profileImage: currentUser.profileImage,
-    point: currentUser.rankingPoint,
-    message: `"${currentUser.nickname}" has invited you to a game.`,
     room,
     createdAt: serverTimestamp()
   });
 
   return { id: inviteId, room };
+}
+
+export async function getPendingGameInviteUserIds(userId, roomCode, candidateUserIds = []) {
+  const cleanUserId = String(userId || "").trim();
+  const cleanRoomCode = String(roomCode || "").trim().toUpperCase();
+  if (!cleanUserId || !cleanRoomCode || !Array.isArray(candidateUserIds) || !candidateUserIds.length) {
+    return [];
+  }
+
+  const inviteId = `game_invite_${cleanRoomCode}_${cleanUserId}`;
+  const results = await Promise.all(candidateUserIds.map(async (candidateUserId) => {
+    const cleanCandidateUserId = String(candidateUserId || "").trim();
+    if (!cleanCandidateUserId) return null;
+
+    try {
+      const inviteDoc = await getDoc(doc(db, "User", cleanCandidateUserId, "Mailbox", inviteId));
+      return inviteDoc.exists() ? cleanCandidateUserId : null;
+    } catch (_error) {
+      return null;
+    }
+  }));
+
+  return results.filter(Boolean);
 }
 
 export async function acceptGameInvite(userId, noticeId) {
@@ -547,6 +596,60 @@ export async function deleteMailboxNotice(userId, noticeId) {
   const cleanNoticeId = String(noticeId || "").trim();
   if (!cleanUserId || !cleanNoticeId) throw new Error("Missing notice data.");
   await deleteDoc(doc(db, "User", cleanUserId, "Mailbox", cleanNoticeId));
+}
+
+export async function updateUserInfo(userId, updates = {}) {
+  const cleanUserId = String(userId || "").trim();
+  if (!cleanUserId) throw new Error("Missing user id.");
+
+  const userRef = doc(db, "User", cleanUserId);
+  const firestoreUpdates = {};
+  const authUser = auth.currentUser;
+
+  if (typeof updates.user_id === "string" && updates.user_id.trim()) {
+    firestoreUpdates.user_id = updates.user_id.trim();
+  }
+
+  if (typeof updates.nickname === "string" && updates.nickname.trim()) {
+    firestoreUpdates.nickname = updates.nickname.trim();
+  }
+
+  if (typeof updates.email === "string" && updates.email.trim()) {
+    const nextEmail = updates.email.trim();
+    if (!authUser || authUser.uid !== cleanUserId) {
+      throw new Error("현재 로그인 정보를 확인할 수 없습니다.");
+    }
+    try {
+      await updateEmail(authUser, nextEmail);
+    } catch (error) {
+      if (error?.code === "auth/requires-recent-login") {
+        throw new Error("이메일을 수정하려면 다시 로그인해 주세요.");
+      }
+      if (error?.code === "auth/email-already-in-use") {
+        throw new Error("이미 사용 중인 이메일입니다.");
+      }
+      throw error;
+    }
+    firestoreUpdates.email = nextEmail;
+  }
+
+  if (typeof updates.password === "string" && updates.password) {
+    if (!authUser || authUser.uid !== cleanUserId) {
+      throw new Error("현재 로그인 정보를 확인할 수 없습니다.");
+    }
+    try {
+      await updatePassword(authUser, updates.password);
+    } catch (error) {
+      if (error?.code === "auth/requires-recent-login") {
+        throw new Error("비밀번호를 수정하려면 다시 로그인해 주세요.");
+      }
+      throw error;
+    }
+    firestoreUpdates.password = updates.password;
+  }
+
+  if (!Object.keys(firestoreUpdates).length) return;
+  await updateDoc(userRef, firestoreUpdates);
 }
 
 async function deleteUserSubcollection(userId, subcollectionName) {

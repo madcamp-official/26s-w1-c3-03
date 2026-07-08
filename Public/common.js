@@ -372,6 +372,44 @@ function saveMockUser() {
   sessionStorage.setItem("loggedInNickname", mockCurrentUser.nickname);
 }
 
+async function syncCurrentUserFromDb() {
+  if (!mockCurrentUser?.id || PREVIEW_GAME_SCREEN) return null;
+
+  try {
+    const { getCurrentUserProfile } = await import(LOGIN_MODULE_URL);
+    if (!getCurrentUserProfile) return null;
+
+    const freshUser = await getCurrentUserProfile(mockCurrentUser.id);
+    if (!freshUser) return null;
+
+    if (typeof freshUser.user_id === "string" && freshUser.user_id.trim()) {
+      mockCurrentUser.loginId = freshUser.user_id;
+    }
+    if (typeof freshUser.nickname === "string" && freshUser.nickname.trim()) {
+      mockCurrentUser.nickname = freshUser.nickname;
+    }
+    if (typeof freshUser.email === "string") {
+      mockCurrentUser.email = freshUser.email;
+    }
+    if (freshUser.point !== undefined || freshUser.rankingPoint !== undefined) {
+      mockCurrentUser.rankingPoint = Number(freshUser.point ?? freshUser.rankingPoint) || 0;
+    }
+    if (freshUser.profile_image || freshUser.profileImage) {
+      mockCurrentUser.profileImage = normalizeProfileImage(freshUser.profile_image || freshUser.profileImage);
+    }
+    if (freshUser.isGuest !== undefined) {
+      mockCurrentUser.isGuest = Boolean(freshUser.isGuest);
+    }
+
+    saveMockUser();
+    renderLobbyUser();
+    return freshUser;
+  } catch (error) {
+    console.error("Failed to sync current user from DB:", error);
+    return null;
+  }
+}
+
 function savePendingRoomAction(action) {
   sessionStorage.setItem(PENDING_ROOM_ACTION_KEY, JSON.stringify(action));
 }
@@ -453,6 +491,7 @@ let friendsLoaded = false;
 let friendsLoading = false;
 let friendsLoadPromise = null;
 let friendDeleteMode = false;
+let pendingInviteFriendIds = new Set();
 
 function loadMockMailboxNotices() {
   sessionStorage.removeItem("colorMasterMockMailbox");
@@ -481,7 +520,10 @@ function mailboxReadIds() {
 
 function hasUnreadMailboxNotices() {
   const readIds = mailboxReadIds();
-  return mockMailboxNotices.some((notice) => !readIds.has(String(notice.id)));
+  return mockMailboxNotices.some((notice) => {
+    const readKey = String(notice.readKey || notice.id || "");
+    return readKey && !readIds.has(readKey);
+  });
 }
 
 function updateMailboxUnreadDots() {
@@ -498,11 +540,13 @@ function updateMailboxUnreadDots() {
   });
 }
 
-function markMailboxNoticeAsRead(noticeId) {
-  const cleanNoticeId = String(noticeId || "").trim();
-  if (!cleanNoticeId) return;
+function markMailboxNoticeAsRead(noticeOrId) {
+  const readKey = typeof noticeOrId === "object" && noticeOrId
+    ? String(noticeOrId.readKey || noticeOrId.id || "").trim()
+    : String(noticeOrId || "").trim();
+  if (!readKey) return;
   const readIds = mailboxReadIds();
-  readIds.add(cleanNoticeId);
+  readIds.add(readKey);
   sessionStorage.setItem(MAILBOX_READ_IDS_KEY, JSON.stringify([...readIds]));
   updateMailboxUnreadDots();
 }
@@ -1250,7 +1294,9 @@ async function loadFriendsFromDb(force = false) {
       friends = dbFriends;
       friendsLoaded = true;
       renderFriendsTable();
-      if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) renderInviteFriendList();
+      if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) {
+        refreshPendingGameInviteFriendIds().then(() => renderInviteFriendList());
+      }
       if (els.friendsStatus) {
         els.friendsStatus.textContent = friends.length
           ? "Recently added friends appear lower."
@@ -1267,7 +1313,9 @@ async function loadFriendsFromDb(force = false) {
       friendsLoading = false;
       friendsLoadPromise = null;
       renderFriendsTable();
-      if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) renderInviteFriendList();
+      if (els.inviteFriendLayer && !els.inviteFriendLayer.hidden) {
+        refreshPendingGameInviteFriendIds().then(() => renderInviteFriendList());
+      }
     });
 
   return friendsLoadPromise;
@@ -1382,7 +1430,14 @@ function renderInviteFriendList() {
       <td>${index + 1}</td>
       <td>${profileImageHtml("invite-friend-profile-image", friend.profileImage)}</td>
       <td>${escapeHtml(friend.nickname)}</td>
-      <td><button class="invite-friend-button" type="button" data-send-game-invite="${escapeHtml(friend.id)}">초대</button></td>
+      <td>
+        <button
+          class="invite-friend-button"
+          type="button"
+          data-send-game-invite="${escapeHtml(friend.id)}"
+          ${pendingInviteFriendIds.has(friend.id) ? "disabled" : ""}
+        >${pendingInviteFriendIds.has(friend.id) ? "보냄" : "초대"}</button>
+      </td>
     </tr>
   `).join("");
 
@@ -1391,10 +1446,36 @@ function renderInviteFriendList() {
   });
 }
 
-function openInviteFriendModal() {
+async function refreshPendingGameInviteFriendIds() {
+  if (!mockCurrentUser.id || !roomClient.roomCode) {
+    pendingInviteFriendIds = new Set();
+    return;
+  }
+
+  try {
+    const { getPendingGameInviteUserIds } = await import(LOGIN_MODULE_URL);
+    if (!getPendingGameInviteUserIds) {
+      pendingInviteFriendIds = new Set();
+      return;
+    }
+
+    const pendingIds = await getPendingGameInviteUserIds(
+      mockCurrentUser.id,
+      roomClient.roomCode,
+      friends.map((friend) => friend.id)
+    );
+    pendingInviteFriendIds = new Set(pendingIds);
+  } catch (error) {
+    console.error("Failed to load pending game invites:", error);
+    pendingInviteFriendIds = new Set();
+  }
+}
+
+async function openInviteFriendModal() {
   // Show online friends after the user clicks an empty waiting-room slot.
   if (!els.inviteFriendLayer) return;
-  loadFriendsFromDb(true);
+  await loadFriendsFromDb(true);
+  await refreshPendingGameInviteFriendIds();
   renderInviteFriendList();
   els.inviteFriendLayer.hidden = false;
   if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "";
@@ -1433,13 +1514,18 @@ async function sendGameInvite(friendId) {
       isPrivate: roomClient.isPrivate,
       name: roomClient.roomName,
       level: roomClient.level,
-      currentPlayers: game.players.length,
       maxPlayers: roomClient.maxPlayers
     });
+    pendingInviteFriendIds.add(friend.id);
+    renderInviteFriendList();
     if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = "";
     if (button) button.textContent = "보냄";
   } catch (error) {
     console.error("Failed to send game invite:", error);
+    if (String(error?.message || "").includes("already pending")) {
+      pendingInviteFriendIds.add(friend.id);
+      renderInviteFriendList();
+    }
     if (els.inviteFriendStatus) els.inviteFriendStatus.textContent = error.message || "Could not send game invite.";
     if (button) button.textContent = previousButtonText;
   } finally {
@@ -2260,7 +2346,14 @@ async function sendFriendRequest() {
     if (els.friendsStatus) els.friendsStatus.textContent = `${friend.nickname}님에게 친구 요청을 보냈습니다.`;
   } catch (error) {
     console.error("Failed to add friend:", error);
-    if (els.friendsStatus) els.friendsStatus.textContent = error.message || "친구 요청을 보내지 못했습니다.";
+    const message = String(error?.message || "");
+    if (message.includes("already pending")) {
+      closeAddFriendModal();
+      showLobbyAlert("이미 친구 신청을 보냈습니다.");
+      if (els.friendsStatus) els.friendsStatus.textContent = "이미 친구 신청을 보냈습니다.";
+    } else {
+      if (els.friendsStatus) els.friendsStatus.textContent = error.message || "친구 요청을 보내지 못했습니다.";
+    }
   } finally {
     if (els.sendFriendRequestButton) {
       els.sendFriendRequestButton.disabled = false;
@@ -2295,7 +2388,8 @@ function createRoomFromLobby() {
     level: Number(els.createLevelSelect.value),
     maxPlayers: Number(els.maxPlayersSelect.value),
     userId: game.localPlayerId,
-    nickname: roomClient.nickname
+    nickname: roomClient.nickname,
+    point: Number(mockCurrentUser.rankingPoint) || 0
   };
 
   if (!IS_GAME_PAGE || IS_LOBBY_PAGE) {
@@ -2327,7 +2421,8 @@ function joinRoom(roomCode, privateCode = "") {
     roomCode: roomClient.roomCode,
     privateCode,
     userId: game.localPlayerId,
-    nickname: roomClient.nickname
+    nickname: roomClient.nickname,
+    point: Number(mockCurrentUser.rankingPoint) || 0
   };
 
   if (IS_LOBBY_PAGE) {
@@ -2377,7 +2472,8 @@ function runPendingRoomAction() {
       level: Number(action.level) || 1,
       maxPlayers: Number(action.maxPlayers) || 5,
       userId: game.localPlayerId,
-      nickname: roomClient.nickname
+      nickname: roomClient.nickname,
+      point: Number(action.point) || Number(mockCurrentUser.rankingPoint) || 0
     });
     setLobbyStatus("Creating room...");
     return true;
@@ -2390,7 +2486,8 @@ function runPendingRoomAction() {
       roomCode: roomClient.roomCode,
       privateCode: roomClient.privateCode,
       userId: game.localPlayerId,
-      nickname: roomClient.nickname
+      nickname: roomClient.nickname,
+      point: Number(action.point) || Number(mockCurrentUser.rankingPoint) || 0
     });
     setLobbyStatus("Joining room...");
     return true;
@@ -2874,12 +2971,35 @@ async function saveUserInfoChanges() {
   }
 }
 
-function openMailboxDetail(noticeId) {
+async function openMailboxDetail(noticeId) {
   // Show the rich detail popup for one mailbox notice.
   const notice = mockMailboxNotices.find((item) => item.id === noticeId);
   if (!notice || !els.mailboxDetailLayer || !els.mailboxDetailContent) return;
 
-  markMailboxNoticeAsRead(notice.id);
+  if (notice.senderId) {
+    try {
+      const { getCurrentUserProfile } = await import(LOGIN_MODULE_URL);
+      const senderProfile = await getCurrentUserProfile(notice.senderId);
+      if (senderProfile) {
+        if (typeof senderProfile.nickname === "string" && senderProfile.nickname.trim()) {
+          notice.sender = senderProfile.nickname;
+          notice.message = notice.type === "invite"
+            ? `"${senderProfile.nickname}" has invited you to a game.`
+            : `"${senderProfile.nickname}" has sent you a friend request.`;
+        }
+        if (senderProfile.point !== undefined || senderProfile.rankingPoint !== undefined) {
+          notice.rankingPoint = Number(senderProfile.point ?? senderProfile.rankingPoint) || 0;
+        }
+        if (senderProfile.profile_image || senderProfile.profileImage) {
+          notice.profileImage = normalizeProfileImage(senderProfile.profile_image || senderProfile.profileImage);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to refresh mailbox sender profile:", error);
+    }
+  }
+
+  markMailboxNoticeAsRead(notice);
   els.mailboxDetailTitle.textContent = notice.type === "friend" ? "친구 신청" : "게임 방 초대";
   const roomHtml = notice.type === "invite" && notice.room
     ? `
@@ -2894,7 +3014,7 @@ function openMailboxDetail(noticeId) {
         </div>
         <div class="mailbox-detail-room-row">
           <span class="mailbox-detail-room-label">Players</span>
-          <span>${notice.room.currentPlayers}/${notice.room.maxPlayers}</span>
+          <span>${notice.room.maxPlayers} Players</span>
         </div>
       </div>
     `
@@ -3321,7 +3441,7 @@ function handleFinalGuessStart(data) {
 }
 
 // 수정해야 됨 
-function handleGameOver(data) {
+async function handleGameOver(data) {
   /*
     Server event: game_over
     Sent after final guesses are submitted or time runs out.
@@ -3340,25 +3460,7 @@ function handleGameOver(data) {
     points: myResult?.earnedPoint ?? 0
   };
 
-  if (mockCurrentUser && game.score.points) {
-    mockCurrentUser.rankingPoint = Number(mockCurrentUser.rankingPoint || 0) + game.score.points;
-    saveMockUser();
-    renderLobbyUser();
-
-    // --------------------------------------------------
-    // ▼ 추가된 부분: 게임 종료 후 변경된 RP를 Firestore DB에 즉시 반영
-    // --------------------------------------------------
-    if (!isGuestUser()) { // 게스트가 아닌 로그인 유저만 DB 업데이트
-      import(LOGIN_MODULE_URL).then(({ updateRankingPoint }) => {
-        if (updateRankingPoint) {
-          // 로컬에 계산된 최신 포인트를 DB에 전송
-          updateRankingPoint(mockCurrentUser.id, mockCurrentUser.rankingPoint);
-        }
-      }).catch((error) => {
-        console.error("DB 업데이트 모듈을 불러오지 못했습니다:", error);
-      });
-    }
-  }
+  await syncCurrentUserFromDb();
 
   render();
 }
@@ -3370,6 +3472,7 @@ function handleGameOver(data) {
 */
 applyGuestUiState();
 renderLobbyUser();
+syncCurrentUserFromDb();
 updateMailboxUnreadDots();
 els.openCreateRoomButton.addEventListener("click", openCreateRoomModal);
 els.closeCreateRoomButton.addEventListener("click", closeCreateRoomModal);

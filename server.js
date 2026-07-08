@@ -551,11 +551,25 @@ function publicPlayers(room) {
     userId: player.userId,
     nickname: player.nickname,
     index,
+    point: Number(player.point) || 0,
     isHost: player.socketId === room.hostSocketId,
     hasPeeked: room.peekedUsers.has(player.userId),
     isReady: player.isReady || false,
     disconnected: Boolean(player.disconnected)
   }));
+}
+
+async function loadUserPoint(userId, fallbackPoint = 0) {
+  if (!userId || !adminDb) return Number(fallbackPoint) || 0;
+
+  try {
+    const userDoc = await adminDb.collection("User").doc(String(userId)).get();
+    if (!userDoc.exists) return Number(fallbackPoint) || 0;
+    return Number(userDoc.data()?.point) || 0;
+  } catch (error) {
+    console.error("Failed to load user point:", error);
+    return Number(fallbackPoint) || 0;
+  }
 }
 
 function hostUserId(room) {
@@ -649,7 +663,7 @@ function createRoom(roomCode, hostSocketId, options = {}) {
   };
 }
 
-function addOrUpdatePlayer(room, socket, userId, nickname) {
+function addOrUpdatePlayer(room, socket, userId, nickname, point = 0) {
   /*
     Add a new player to a waiting room, or update the socket id if the same
     browser joins again before the game starts.
@@ -658,6 +672,7 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
   if (existingPlayer) {
     existingPlayer.socketId = socket.id;
     existingPlayer.nickname = nickname;
+    existingPlayer.point = Number(point) || 0;
     return true;
   }
 
@@ -669,6 +684,7 @@ function addOrUpdatePlayer(room, socket, userId, nickname) {
     socketId: socket.id,
     userId,
     nickname,
+    point: Number(point) || 0,
     isReady: false,
     disconnected: false,
     boundaries: createBoundaries(),
@@ -945,13 +961,14 @@ function startFinalGuess(room) {
 }
 
 // 수정 필요함 
-function endGame(room) {
+async function endGame(room) {
   /*
     Calculate final rankings and send results to all players.
 
     The target is the average RGB generated at game start. Lower total RGB error
     is better.
   */
+  if (!room || room.phase === "GAME_OVER") return;
   clearRoomTimer(room);
   room.phase = "GAME_OVER";
   const target = room.targetData.average;
@@ -985,19 +1002,23 @@ function endGame(room) {
     finalSubmittedOrder: player.finalSubmittedOrder ?? null
   }));
 
+  if (adminDb) {
+    await Promise.all(results.map(async (result) => {
+      if (!result.userId || result.userId.startsWith("preview_")) return;
+      try {
+        await adminDb.collection("User").doc(result.userId).update({
+          point: FieldValue.increment(result.earnedPoint)
+        });
+      } catch (error) {
+        console.error("RP update failed:", error);
+      }
+    }));
+  }
+
   io.to(room.roomCode).emit("game_over", {
     targetRgb: target,
     results
   });
-
-  if (adminDb) {
-    results.forEach((result) => {
-      if (!result.userId || result.userId.startsWith("preview_")) return;
-      adminDb.collection("User").doc(result.userId).update({
-        point: FieldValue.increment(result.earnedPoint)
-      }).catch((error) => console.error("RP update failed:", error));
-    });
-  }
 
   // The room is finished, so remove it from memory.
   activeRooms.delete(room.roomCode);
@@ -1108,26 +1129,26 @@ io.on("connection", (socket) => {
     const cleanRoomCode = normalizeRoomCode(roomCode);
     const room = activeRooms.get(cleanRoomCode);
     if (!room) {
-      respond({ ok: false, message: "Room not found." });
+      respond({ ok: false, message: "방을 찾을 수 없습니다." });
       return;
     }
     if (room.phase !== "WAITING") {
-      respond({ ok: false, message: "This room already started." });
+      respond({ ok: false, message: "게임이 이미 시작되었습니다." });
       return;
     }
     if (room.isPrivate && normalizeOptionalRoomCode(privateCode) !== room.joinCode) {
-      respond({ ok: false, message: "Incorrect room code." });
+      respond({ ok: false, message: "올바르지 않은 방 코드입니다." });
       return;
     }
     if (room.players.length >= room.maxPlayers) {
-      respond({ ok: false, message: "This room is full." });
+      respond({ ok: false, message: "방 인원이 다 찼습니다." });
       return;
     }
 
     respond({ ok: true });
   });
 
-  socket.on("create_room", ({ roomName, roomCode, level, maxPlayers, userId, nickname }) => {
+  socket.on("create_room", async ({ roomName, roomCode, level, maxPlayers, userId, nickname, point }) => {
     /*
       create_room is sent from the create-room popup.
       The creator is automatically added to the new waiting room and becomes host.
@@ -1145,13 +1166,14 @@ io.on("connection", (socket) => {
     });
 
     activeRooms.set(generatedRoomCode, room);
-    addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname);
+    const currentPoint = await loadUserPoint(cleanUserId, point);
+    addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, currentPoint);
     socket.join(generatedRoomCode);
     emitRoomUpdate(room);
     emitRoomList();
   });
 
-  socket.on("join_room", ({ roomCode, privateCode, userId, nickname }) => {
+  socket.on("join_room", async ({ roomCode, privateCode, userId, nickname, point }) => {
     /*
       join_room is sent from the lobby.
 
@@ -1165,19 +1187,20 @@ io.on("connection", (socket) => {
 
     const room = activeRooms.get(cleanRoomCode);
     if (!room) {
-      sendError(socket, "Room not found.");
+      sendError(socket, "방을 찾을 수 없습니다.");
       return;
     }
     if (room.phase !== "WAITING") {
-      sendError(socket, "This room already started.");
+      sendError(socket, "게임이 이미 시작되었습니다.");
       return;
     }
     if (room.isPrivate && normalizeOptionalRoomCode(privateCode) !== room.joinCode) {
-      sendError(socket, "Incorrect room code.");
+      sendError(socket, "올바르지 않은 방 코드입니다.");
       return;
     }
-    if (!addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname)) {
-      sendError(socket, "This room is full.");
+    const currentPoint = await loadUserPoint(cleanUserId, point);
+    if (!addOrUpdatePlayer(room, socket, cleanUserId, cleanNickname, currentPoint)) {
+      sendError(socket, "방 인원이 다 찼습니다.");
       return;
     }
 
