@@ -2350,10 +2350,18 @@ async function sendFriendRequest() {
   } catch (error) {
     console.error("Failed to add friend:", error);
     const message = String(error?.message || "");
-    if (message.includes("already pending")) {
+    if (message.includes("No user found with that nickname")) {
+      closeAddFriendModal();
+      showLobbyAlert("존재하지 않는 유저입니다.");
+      if (els.friendsStatus) els.friendsStatus.textContent = "존재하지 않는 유저입니다.";
+    } else if (message.includes("already pending")) {
       closeAddFriendModal();
       showLobbyAlert("이미 친구 신청을 보냈습니다.");
       if (els.friendsStatus) els.friendsStatus.textContent = "이미 친구 신청을 보냈습니다.";
+    } else if (message.includes("already sent you a friend request")) {
+      closeAddFriendModal();
+      showLobbyAlert("상대방이 이미 친구 신청을 보냈습니다. 알림함에서 확인해 주세요.");
+      if (els.friendsStatus) els.friendsStatus.textContent = "상대방이 이미 친구 신청을 보냈습니다.";
     } else {
       if (els.friendsStatus) els.friendsStatus.textContent = error.message || "친구 요청을 보내지 못했습니다.";
     }

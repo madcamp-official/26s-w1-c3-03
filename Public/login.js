@@ -421,12 +421,24 @@ export async function sendFriendRequestByNickname(userId, friendNickname) {
   if (existingFriendDoc.exists()) throw new Error("This user is already your friend.");
 
   const friend = friendFromUserDoc(friendUserId, friendUserDoc.data());
-  const requestId = `friend_request_${cleanUserId}`;
-  const requestDocRef = doc(db, "User", friendUserId, "Mailbox", requestId);
-  const existingRequestDoc = await getDoc(requestDocRef);
-  if (existingRequestDoc.exists()) throw new Error("Friend request is already pending.");
+  const outgoingRequestId = `friend_request_${cleanUserId}`;
+  const outgoingRequestDocRef = doc(db, "User", friendUserId, "Mailbox", outgoingRequestId);
+  const incomingRequestId = `friend_request_${friendUserId}`;
+  const incomingRequestDocRef = doc(db, "User", cleanUserId, "Mailbox", incomingRequestId);
+  const [existingOutgoingRequestDoc, existingIncomingRequestDoc] = await Promise.all([
+    getDoc(outgoingRequestDocRef),
+    getDoc(incomingRequestDocRef)
+  ]);
 
-  await setDoc(requestDocRef, {
+  if (existingOutgoingRequestDoc.exists()) {
+    throw new Error("Friend request is already pending.");
+  }
+
+  if (existingIncomingRequestDoc.exists()) {
+    throw new Error("This user has already sent you a friend request.");
+  }
+
+  await setDoc(outgoingRequestDocRef, {
     type: "friend",
     senderId: cleanUserId,
     createdAt: serverTimestamp()
@@ -460,6 +472,7 @@ export async function acceptFriendRequest(userId, requestId) {
 
   const currentUser = friendFromUserDoc(cleanUserId, currentUserDoc.data());
   const senderUser = friendFromUserDoc(senderId, senderUserDoc.data());
+  const reverseRequestDocRef = doc(db, "User", senderId, "Mailbox", `friend_request_${cleanUserId}`);
 
   await Promise.all([
     setDoc(doc(db, "User", cleanUserId, "Friends", senderId), {
@@ -478,7 +491,8 @@ export async function acceptFriendRequest(userId, requestId) {
       profile_image: currentUser.profileImage,
       createdAt: serverTimestamp()
     }, { merge: true }),
-    deleteDoc(requestDocRef)
+    deleteDoc(requestDocRef),
+    deleteDoc(reverseRequestDocRef).catch(() => {})
   ]);
 
   return senderUser;
