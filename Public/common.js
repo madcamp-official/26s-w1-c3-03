@@ -2959,6 +2959,10 @@ async function saveUserInfoChanges() {
     }
 
     Object.assign(mockCurrentUser, nextValues);
+    if (Object.prototype.hasOwnProperty.call(nextValues, "password")) {
+      // Keep the real password out of session/local UI state after Firebase Auth updates it.
+      mockCurrentUser.password = "*******";
+    }
 
     saveMockUser();
     renderLobbyUser();

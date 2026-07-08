@@ -645,7 +645,6 @@ export async function updateUserInfo(userId, updates = {}) {
       }
       throw error;
     }
-    firestoreUpdates.password = updates.password;
   }
 
   if (!Object.keys(firestoreUpdates).length) return;
