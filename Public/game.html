@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -87,7 +87,7 @@
                   <th>No.</th>
                   <th>Profile</th>
                   <th>Nickname</th>
-                  <th>초대</th>
+                  <th>Invite</th>
                 </tr>
               </thead>
               <tbody id="inviteFriendTableBody"></tbody>
@@ -113,14 +113,12 @@
 
       <header class="top-bar">
         <div>
-          <p class="eyebrow">REAL-TIME RGB GUESS</p>
           <h2 class="game-title">Color Master</h2>
         </div>
       </header>
 
       <aside class="sidebar">
         <div class="round-card">
-          <span class="round-caption">Current Round</span>
           <h2 class="round-label" id="roundLabel">Round 1</h2>
         </div>
 
@@ -143,13 +141,13 @@
         <div class="target-card">
           <div class="card-label">TARGET IMAGE</div>
           <div class="image-stage" id="targetImage" role="img" aria-label="Target color image"></div>
-          <p class="target-helper">Guess the average RGB value of the target image.</p>
+          <p class="target-helper">이미지의 평균 RGB 값을 맞춰보세요.</p>
         </div>
 
         <div class="guess-card">
           <div class="guess-header">
             <span>RGB Guess</span>
-            <small>Enter values from 0 to 255</small>
+            <small>0부터 255 사이의 숫자를 입력하세요.</small>
           </div>
           <div class="rgb-controls" id="rgbControls"></div>
         </div>
@@ -179,25 +177,27 @@
 
       <div class="choice-layer" id="choiceLayer" hidden>
         <div class="choice-card" role="dialog" aria-modal="true" aria-labelledby="choiceTitle">
-          <div class="choice-popup-timer" aria-live="polite">
-            <span class="choice-popup-time" id="choicePopupTime">10</span>
-            <span class="choice-popup-caption">SECONDS</span>
+          <div class="choice-heading">
+            <div class="choice-popup-timer" aria-live="polite">
+              <span class="choice-popup-time" id="choicePopupTime">10</span>
+              <span class="choice-popup-caption">SECONDS</span>
+            </div>
+            <h3 class="choice-title" id="choiceTitle">어떤 색을 볼까요?</h3>
           </div>
           <button class="choice-close-button" id="closeChoice" type="button">Close</button>
-          <p class="modal-kicker">PEEK PHASE</p>
-          <h3 class="choice-title" id="choiceTitle">어떤 색을 볼까요?</h3>
           <div class="choice-buttons" id="choiceButtons"></div>
         </div>
       </div>
 
       <div class="final-layer" id="finalLayer" hidden>
         <div class="final-modal" role="dialog" aria-modal="true" aria-labelledby="finalTitle">
-          <div class="final-popup-timer" aria-live="polite">
-            <span class="final-popup-time" id="finalPopupTime">30</span>
-            <span class="final-popup-caption">SECONDS</span>
+          <div class="final-heading">
+            <div class="final-popup-timer" aria-live="polite">
+              <span class="final-popup-time" id="finalPopupTime">30</span>
+              <span class="final-popup-caption">SECONDS</span>
+            </div>
+            <h4 class="final-title" id="finalTitle">최종 답안</h4>
           </div>
-          <p class="modal-kicker">FINAL GUESS</p>
-          <h4 class="final-title" id="finalTitle">Final Guess</h4>
           <div class="final-target-image" id="finalTargetImage" role="img" aria-label="Final target color"></div>
           <div class="final-inputs" aria-label="Final RGB input">
             <div class="final-channel">
@@ -231,13 +231,13 @@
               <div class="bound" data-final-bound-low="b">0</div>
             </div>
           </div>
-          <button class="final-submit-button" id="submitFinalButton" type="button">Submit Final Guess</button>
+          <button class="final-submit-button" id="submitFinalButton" type="button">최종 답안 제출</button>
         </div>
       </div>
 
       <div class="result-layer" id="resultLayer" hidden>
         <div class="result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
-          <h3 class="result-title" id="resultTitle">Game Result</h3>
+          <h3 class="result-title" id="resultTitle">게임 결과</h3>
           <div class="result-text" id="resultText" aria-live="polite"></div>
           <button class="result-button" id="closeResult" type="button">Close</button>
         </div>

@@ -65,6 +65,18 @@ function saveCurrentUserSession(uid, userData, loginType) {
   return currentUser;
 }
 
+export async function checkEmailDuplicate(email) {
+  try {
+    const q = query(collection(db, "User"), where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error("이메일 중복 확인 에러:", error);
+    alert("서버 연결에 실패했습니다.");
+    return true;
+  }
+}
+
 // ---------------------------------------------------
 // 1. 일반 이메일 회원가입
 // ---------------------------------------------------
@@ -260,7 +272,7 @@ function friendFromUserDoc(userId, userData = {}, fallbackData = {}) {
   return {
     id: userId,
     nickname: userData.nickname || fallbackData.nickname || "Player",
-    rankingPoint: Number(userData.point ?? userData.rankingPoint ?? fallbackData.rankingPoint) || 0,
+    rankingPoint: Number(userData.point ?? userData.rankingPoint ?? fallbackData.point ?? fallbackData.rankingPoint) || 0,
     profileImage: normalizeProfileImage(userData.profile_image || userData.profileImage || fallbackData.profileImage),
     online: Boolean(userData.online) && recentlyActive
   };
@@ -333,11 +345,8 @@ function mailboxNoticeFromDoc(noticeDoc) {
     sender,
     createdAt,
     profileImage: normalizeProfileImage(data.profileImage || data.profile_image),
-    rankingPoint: Number(data.rankingPoint ?? data.point) || 0,
+    rankingPoint: Number(data.point ?? data.rankingPoint) || 0,
     message: data.message || (type === "friend"
-      ? `"${sender}" has sent you a friend request.`
-      : `"${sender}" has invited you to a game.`),
-    fullMessage: data.fullMessage || (type === "friend"
       ? `"${sender}" has sent you a friend request.`
       : `"${sender}" has invited you to a game.`),
     room: data.room || null
@@ -383,13 +392,11 @@ export async function sendFriendRequestByNickname(userId, friendNickname) {
 
   await setDoc(requestDocRef, {
     type: "friend",
-    status: "pending",
     senderId: cleanUserId,
     sender: currentUser.nickname,
     profileImage: currentUser.profileImage,
-    rankingPoint: currentUser.rankingPoint,
+    point: currentUser.rankingPoint,
     message: `"${currentUser.nickname}" has sent you a friend request.`,
-    fullMessage: `"${currentUser.nickname}" has sent you a friend request.`,
     createdAt: serverTimestamp()
   });
 
@@ -427,18 +434,16 @@ export async function acceptFriendRequest(userId, requestId) {
       user_id: cleanUserId,
       fd_id: senderId,
       nickname: senderUser.nickname,
-      rankingPoint: senderUser.rankingPoint,
+      point: senderUser.rankingPoint,
       profileImage: senderUser.profileImage,
-      online: senderUser.online,
       createdAt: serverTimestamp()
     }, { merge: true }),
     setDoc(doc(db, "User", senderId, "Friends", cleanUserId), {
       user_id: senderId,
       fd_id: cleanUserId,
       nickname: currentUser.nickname,
-      rankingPoint: currentUser.rankingPoint,
+      point: currentUser.rankingPoint,
       profileImage: currentUser.profileImage,
-      online: currentUser.online,
       createdAt: serverTimestamp()
     }, { merge: true }),
     deleteDoc(requestDocRef)
@@ -491,13 +496,11 @@ export async function sendGameInvite(userId, friendUserId, roomInfo = {}) {
 
   await setDoc(inviteDocRef, {
     type: "invite",
-    status: "pending",
     senderId: cleanUserId,
     sender: currentUser.nickname,
     profileImage: currentUser.profileImage,
-    rankingPoint: currentUser.rankingPoint,
+    point: currentUser.rankingPoint,
     message: `"${currentUser.nickname}" has invited you to a game.`,
-    fullMessage: `"${currentUser.nickname}" has invited you to a game.`,
     room,
     createdAt: serverTimestamp()
   });

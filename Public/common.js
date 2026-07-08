@@ -1501,6 +1501,7 @@ function renderLobby() {
     - main lobby: list of waiting rooms
     - waiting lobby: players inside one joined room
   */
+  renderLobbyUser();
   const showLobby = isLobbyPhase();
   els.lobbyScreen.hidden = !showLobby;
   els.gameBoard.hidden = showLobby;
@@ -1748,7 +1749,7 @@ function renderChannels() {
 
   els.rgbControls.innerHTML = `
     ${channelsHtml}
-    <button class="submit-button" id="submitButton" type="button" disabled>Submit</button>
+    <button class="submit-button" id="submitButton" type="button" disabled>제출</button>
   `;
 
   // innerHTML = ... creates a new button every time -> code must attach the click behavior again
@@ -1937,7 +1938,7 @@ function renderResultModal() {
         ${resultBoxesFor(game.targetRgb, "Correct")}
       </div>
     </div>
-    <p class="result-total-error">My total error: ${game.score.totalError ?? "-"}</p>
+    <p class="result-total-error">오차 합계: ${game.score.totalError ?? "-"}</p>
     <div class="result-table-wrap">
       <table class="result-table">
         <thead>
@@ -2605,7 +2606,7 @@ function sanitizeUserInfoInput(input) {
     input.value = input.value.replace(/[^a-zA-Z0-9]/g, "");
   }
   if (input.id === "userInfoNicknameInput") {
-    input.value = input.value.normalize("NFC").replace(/[^a-zA-Z0-9가-힣]/g, "");
+    input.value = input.value.normalize("NFC").replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ]/g, "");
   }
   if (input.id === "userInfoEmailInput") {
     input.value = input.value.trim();
@@ -2621,7 +2622,7 @@ function checkUserInfoFormat(input) {
   }
 
   if (input.id === "userInfoNicknameInput") {
-    return /^[a-zA-Z0-9가-힣]{2,12}$/.test(value);
+    return /^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ]{2,12}$/.test(value);
   }
 
   if (input.id === "userInfoIdInput") {
@@ -2654,6 +2655,13 @@ async function validateUserInfoInput(input, checkDuplicate = false) {
     const { checkIdDuplicate } = await import(LOGIN_MODULE_URL);
     if (await checkIdDuplicate(nextValue)) {
       return { valid: false, message: "이미 사용 중인 아이디입니다." };
+    }
+  }
+
+  if (checkDuplicate && valueChanged && input.id === "userInfoEmailInput") {
+    const { checkEmailDuplicate } = await import(LOGIN_MODULE_URL);
+    if (await checkEmailDuplicate(nextValue)) {
+      return { valid: false, message: "이미 사용 중인 이메일입니다." };
     }
   }
 
@@ -2877,7 +2885,7 @@ function openMailboxDetail(noticeId) {
     ? `
       <div class="mailbox-detail-room" aria-label="Room information">
         <div class="mailbox-detail-room-row">
-          <span class="mailbox-detail-room-label">Room Name</span>
+          <span class="mailbox-detail-room-label">Name</span>
           <span>${escapeHtml(notice.room.name)}</span>
         </div>
         <div class="mailbox-detail-room-row">
@@ -3335,6 +3343,7 @@ function handleGameOver(data) {
   if (mockCurrentUser && game.score.points) {
     mockCurrentUser.rankingPoint = Number(mockCurrentUser.rankingPoint || 0) + game.score.points;
     saveMockUser();
+    renderLobbyUser();
 
     // --------------------------------------------------
     // ▼ 추가된 부분: 게임 종료 후 변경된 RP를 Firestore DB에 즉시 반영

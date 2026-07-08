@@ -719,9 +719,9 @@
   grid-area: top;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 24px;
-  padding: 4px 58px 6px 2px;
+  padding: 0 58px 0 2px;
 }
 
 .modal-kicker,
@@ -736,7 +736,7 @@
 }
 
 .game-title {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: clamp(34px, 5vw, 60px);
   line-height: 0.94;
   letter-spacing: -0.06em;
@@ -891,19 +891,16 @@
 }
 
 .round-card {
+  display: grid;
+  place-items: center;
   padding: 18px;
-  text-align: center;
-}
-
-.round-caption {
-  display: block;
   text-align: center;
 }
 
 .round-label {
   position: static;
   width: 100%;
-  margin: 8px 0 0;
+  margin: 0;
   transform: none;
   text-align: center;
   font-size: 34px;
@@ -1274,7 +1271,7 @@ input.value-box:focus {
   border-radius: 16px;
   background: linear-gradient(135deg, #7cf7ff, #7c5cff 48%, #ff4bd8);
   color: #ffffff;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 950;
   box-shadow: 0 14px 34px rgba(124, 92, 255, 0.30);
   transition: transform 160ms ease, filter 160ms ease, opacity 160ms ease;
@@ -1474,10 +1471,18 @@ input.value-box:focus {
   padding: 58px 38px 42px;
 }
 
+.choice-heading {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding-right: 54px;
+}
+
 .choice-popup-timer {
-  position: absolute;
-  top: 30px;
-  left: 30px;
+  position: relative;
+  transform: translateX(-5px);
   width: 90px;
   height: 90px;
   display: grid;
@@ -1528,6 +1533,10 @@ input.value-box:focus {
   font-weight: 950;
   letter-spacing: -0.06em;
   text-align: center;
+}
+
+.choice-heading .choice-title {
+  text-align: left;
 }
 
 .choice-buttons {
@@ -1615,14 +1624,22 @@ input.value-box:focus {
 
 .final-modal {
   width: min(520px, 100%);
-  padding-top: 58px;
+  padding-top: 38px;
   gap: 18px;
 }
 
+.final-heading {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  align-items: center;
+  column-gap: 18px;
+}
+
 .final-popup-timer {
-  position: absolute;
-  top: 35px;
-  left: 35px;
+  grid-column: 1;
+  justify-self: start;
+  position: relative;
   width: 90px;
   height: 90px;
   display: grid;
@@ -1633,6 +1650,7 @@ input.value-box:focus {
   background:
     conic-gradient(from 160deg, #54f2ff, #4b7dff, #ff4bd8, #ffe85a, #54f2ff);
   box-shadow: var(--glow-blue);
+  transform: translateX(6px);
 }
 
 .final-popup-timer::before {
@@ -1655,6 +1673,12 @@ input.value-box:focus {
   font-size: 38px;
   line-height: 0.92;
   font-weight: 950;
+}
+
+.final-heading .final-title {
+  grid-column: 2;
+  justify-self: center;
+  text-align: center;
 }
 
 .final-popup-caption {

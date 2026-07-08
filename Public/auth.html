@@ -71,9 +71,13 @@
         <button class="profile-action-button choice-image-button" id="choiceProfileImageButton" type="button">프로필 사진 선택</button>
         <input id="signup-profile-file" type="file" accept="image/*" hidden />
       </div>
-      <div class="input-group">
+      <div class="input-group secondary">
         <label for="signup-email">이메일</label>
-        <input type="email" id="signup-email" placeholder="이메일 입력" spellcheck="false">
+        <div class="input-with-btn">
+          <input type="email" id="signup-email" placeholder="이메일 입력" spellcheck="false">
+          <button class="btn-secondary" id="btn-check-email" type="button">중복 확인</button>
+        </div>
+        <span id="email-status" class="auth-status"></span>
       </div>
       <div class="input-group secondary">
         <label for="signup-nickname">닉네임</label>
@@ -108,9 +112,13 @@
         <button class="profile-action-button choice-image-button" id="googleChoiceProfileImageButton" type="button">프로필 사진 선택</button>
         <input id="g-signup-profile-file" type="file" accept="image/*" hidden />
       </div>
-      <div class="input-group">
+      <div class="input-group secondary">
         <label for="g-signup-email">이메일</label>
-        <input type="email" id="g-signup-email" placeholder="이메일 입력" spellcheck="false">
+        <div class="input-with-btn">
+          <input type="email" id="g-signup-email" placeholder="이메일 입력" spellcheck="false">
+          <button class="btn-secondary" id="btn-g-check-email" type="button">중복 확인</button>
+        </div>
+        <span id="g-email-status" class="auth-status"></span>
       </div>
       <div class="input-group secondary">
         <label for="g-signup-nickname">닉네임</label>

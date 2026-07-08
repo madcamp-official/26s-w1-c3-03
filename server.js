@@ -994,8 +994,7 @@ function endGame(room) {
     results.forEach((result) => {
       if (!result.userId || result.userId.startsWith("preview_")) return;
       adminDb.collection("User").doc(result.userId).update({
-        point: FieldValue.increment(result.earnedPoint),
-        rankingPoint: FieldValue.increment(result.earnedPoint)
+        point: FieldValue.increment(result.earnedPoint)
       }).catch((error) => console.error("RP update failed:", error));
     });
   }

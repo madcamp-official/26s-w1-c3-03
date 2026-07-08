@@ -5,12 +5,14 @@ import {
     completeGoogleSignUp, 
     checkIdDuplicate, 
     checkNicknameDuplicate,
+    checkEmailDuplicate,
     loginAsGuest
   } from './login.js';
 
   // 상태 관리 변수 (중복 확인 통과 여부)
   let isIdValid = false;
   let isNicknameValid = false;
+  let isEmailChecked = false;
   let tempGoogleData = null;
   let isGuestNicknameValid = false;
 
@@ -112,13 +114,16 @@ import {
     resetTextInput('signup-nickname');
     resetTextInput('signup-id');
     resetTextInput('signup-password');
+    clearStatus('email-status');
     clearStatus('nickname-status');
     clearStatus('id-status');
     resetProfilePreview('defaultProfileImage', 'signup-profile-file');
     isIdValid = false;
     isNicknameValid = false;
     isEmailValid = false;
+    isEmailChecked = false;
     isPasswordValid = false;
+    btnCheckEmail.disabled = true;
     btnCheckId.disabled = true;
     btnCheckNickname.disabled = true;
     btnSignup.disabled = true;
@@ -128,11 +133,15 @@ import {
     resetTextInput('g-signup-email');
     resetTextInput('g-signup-nickname');
     resetTextInput('g-signup-id');
+    clearStatus('g-email-status');
     clearStatus('g-nickname-status');
     clearStatus('g-id-status');
     resetProfilePreview('g-defaultProfileImage', 'g-signup-profile-file');
+    isGoogleEmailValid = false;
+    isGoogleEmailChecked = false;
     isGoogleIdValid = false;
     isGoogleNicknameValid = false;
+    googleBtnCheckEmail.disabled = true;
     googleBtnCheckId.disabled = true;
     googleBtnCheckNickname.disabled = true;
     googleBtnSignup.disabled = true;
@@ -283,6 +292,7 @@ import {
       document.getElementById('g-signup-id').value = result.email.split('@')[0];
       document.getElementById('g-signup-nickname').value = result.nickname ? result.nickname.normalize('NFC') : "";
 
+      document.getElementById('g-signup-email').dispatchEvent(new Event('input'));
       document.getElementById('g-signup-id').dispatchEvent(new Event('input'));
       document.getElementById('g-signup-nickname').dispatchEvent(new Event('input'));
 
@@ -301,6 +311,7 @@ import {
       document.getElementById('g-signup-id').value = result.email.split('@')[0];
       document.getElementById('g-signup-nickname').value = result.nickname ? result.nickname.normalize('NFC') : "";
 
+      document.getElementById('g-signup-email').dispatchEvent(new Event('input'));
       document.getElementById('g-signup-id').dispatchEvent(new Event('input'));
       document.getElementById('g-signup-nickname').dispatchEvent(new Event('input'));
 
@@ -345,6 +356,7 @@ import {
   const signupEmailInput = document.getElementById('signup-email');
   const signupPasswordInput = document.getElementById('signup-password');
 
+  const btnCheckEmail = document.getElementById('btn-check-email');
   const btnCheckId = document.getElementById('btn-check-id');
   const btnCheckNickname = document.getElementById('btn-check-nickname');
   const btnSignup = document.getElementById('btn-signup');
@@ -354,13 +366,14 @@ import {
   let isPasswordValid = false;
 
   // 초기 버튼 상태 (모두 잠금)
+  btnCheckEmail.disabled = true;
   btnCheckId.disabled = true;
   btnCheckNickname.disabled = true;
   btnSignup.disabled = true;
 
   // 모든 조건이 통과했을 때만 가입 버튼 활성화하는 함수
   function updateSignupButtonState() {
-    if (isIdValid && isNicknameValid && isEmailValid && isPasswordValid) {
+    if (isIdValid && isNicknameValid && isEmailValid && isEmailChecked && isPasswordValid) {
       btnSignup.disabled = false;
     } else {
       btnSignup.disabled = true;
@@ -371,7 +384,7 @@ import {
   signupIdInput.addEventListener('input', (event) => {
     // 영문, 숫자만 남기고 삭제
     event.target.value = event.target.value.replace(/[^a-zA-Z0-9]/g, '');
-    const val = event.target.value;
+    const val = event.target.value.trim();
 
     // 값이 바뀌었으므로 기존 중복확인 통과 기록 초기화
     isIdValid = false; 
@@ -457,8 +470,13 @@ import {
 
   // 3. 이메일 입력 (형식 검사)
   signupEmailInput.addEventListener('input', (event) => {
-    const val = event.target.value;
+    const val = event.target.value.trim();
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    const statusEl = document.getElementById('email-status');
+
+    event.target.value = val;
+    isEmailChecked = false;
+    if (statusEl) statusEl.innerText = "";
 
     if (val === "") {
       setBorderColor(event.target, "var(--line)");; // 지웠을 때 원래 색으로
@@ -469,6 +487,27 @@ import {
     } else {
       setBorderColor(event.target, "rgba(255, 90, 90, 0.5)");
       isEmailValid = false;
+    }
+    if (val === "") isEmailValid = false;
+    btnCheckEmail.disabled = val === "" || !emailRegex.test(val);
+    updateSignupButtonState();
+  });
+
+  btnCheckEmail.addEventListener('click', async () => {
+    const emailVal = signupEmailInput.value.trim();
+    const isDup = await checkEmailDuplicate(emailVal);
+    const statusEl = document.getElementById('email-status');
+
+    if (isDup) {
+      statusEl.innerText = "이미 사용 중인 이메일입니다.";
+      statusEl.style.color = "rgba(255, 90, 90, 0.5)";
+      setBorderColor(signupEmailInput, "rgba(255, 90, 90, 0.5)");
+      isEmailChecked = false;
+    } else {
+      statusEl.innerText = "사용 가능한 이메일입니다.";
+      statusEl.style.color = "rgba(90, 255, 90, 0.5)";
+      setBorderColor(signupEmailInput, "var(--line)");
+      isEmailChecked = true;
     }
     updateSignupButtonState();
   });
@@ -519,6 +558,8 @@ import {
   // 구글 전용 상태 변수 선언
   let isGoogleIdValid = false;
   let isGoogleNicknameValid = false;
+  let isGoogleEmailValid = false;
+  let isGoogleEmailChecked = false;
 
   const googleSignupProfileFile = document.getElementById('g-signup-profile-file');
   const googleChoiceProfileImageButton = document.getElementById('googleChoiceProfileImageButton');
@@ -542,25 +583,72 @@ import {
     }
   });
   
+  const googleSignupEmailInput = document.getElementById('g-signup-email');
   const googleSignupIdInput = document.getElementById('g-signup-id');
   const googleSignupNicknameInput = document.getElementById('g-signup-nickname');
 
+  const googleBtnCheckEmail = document.getElementById('btn-g-check-email');
   const googleBtnCheckId = document.getElementById('btn-g-check-id');
   const googleBtnCheckNickname = document.getElementById('btn-g-check-nickname');
   const googleBtnSignup = document.getElementById('btn-g-signup-complete'); 
 
   // 초기 버튼 상태 (모두 잠금)
+  googleBtnCheckEmail.disabled = true;
   googleBtnCheckId.disabled = true;
   googleBtnCheckNickname.disabled = true;
   googleBtnSignup.disabled = true;
 
   function updateGoogleSignupButtonState() {
-    if (isGoogleIdValid && isGoogleNicknameValid) {
+    if (isGoogleIdValid && isGoogleNicknameValid && isGoogleEmailValid && isGoogleEmailChecked) {
       googleBtnSignup.disabled = false;
     } else {
       googleBtnSignup.disabled = true;
     }
   }
+
+  googleSignupEmailInput.addEventListener('input', (event) => {
+    const val = event.target.value.trim();
+    event.target.value = val;
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    const statusEl = document.getElementById('g-email-status');
+
+    isGoogleEmailChecked = false;
+    if (statusEl) statusEl.innerText = "";
+
+    if (val === "") {
+      setBorderColor(event.target, "var(--line)");
+      isGoogleEmailValid = false;
+      googleBtnCheckEmail.disabled = true;
+    } else if (emailRegex.test(val)) {
+      setBorderColor(event.target, "var(--line)");
+      isGoogleEmailValid = true;
+      googleBtnCheckEmail.disabled = false;
+    } else {
+      setBorderColor(event.target, "rgba(255, 90, 90, 0.5)");
+      isGoogleEmailValid = false;
+      googleBtnCheckEmail.disabled = true;
+    }
+    updateGoogleSignupButtonState();
+  });
+
+  googleBtnCheckEmail.addEventListener('click', async () => {
+    const emailVal = googleSignupEmailInput.value.trim();
+    const isDup = await checkEmailDuplicate(emailVal);
+    const statusEl = document.getElementById('g-email-status');
+
+    if (isDup) {
+      statusEl.innerText = "이미 사용 중인 이메일입니다.";
+      statusEl.style.color = "rgba(255, 90, 90, 0.5)";
+      setBorderColor(googleSignupEmailInput, "rgba(255, 90, 90, 0.5)");
+      isGoogleEmailChecked = false;
+    } else {
+      statusEl.innerText = "사용 가능한 이메일입니다.";
+      statusEl.style.color = "rgba(90, 255, 90, 0.5)";
+      setBorderColor(googleSignupEmailInput, "var(--line)");
+      isGoogleEmailChecked = true;
+    }
+    updateGoogleSignupButtonState();
+  });
 
   // 1. 아이디 입력 
   googleSignupIdInput.addEventListener('input', (event) => {
@@ -655,11 +743,12 @@ import {
   googleBtnSignup.addEventListener('click', async () => {
     if(googleBtnSignup.disabled) return;
 
+    const email = document.getElementById('g-signup-email').value.trim();
     const id = document.getElementById('g-signup-id').value;
     const nick = document.getElementById('g-signup-nickname').value.trim().normalize('NFC');
     const file = document.getElementById('g-signup-profile-file').files[0];
 
-    await completeGoogleSignUp(tempGoogleData.uid, tempGoogleData.email, id, nick, tempGoogleData.photoURL, file);
+    await completeGoogleSignUp(tempGoogleData.uid, email, id, nick, tempGoogleData.photoURL, file);
     showSection('login-section'); 
   });
 

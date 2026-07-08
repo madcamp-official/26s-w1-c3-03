@@ -987,6 +987,8 @@ body.is-guest-user .main-lobby-panel .lobby-room-panel {
   font-weight: 900;
   text-align: center;
   text-transform: uppercase;
+  padding-top: 0px;
+  padding-bottom: 10px;
 }
 
 .room-row {
