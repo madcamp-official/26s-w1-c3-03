@@ -100,9 +100,63 @@
 
 > API 주소, 요청 방식, 요청값, 응답값, 에러 상황을 정리
 
-| Method | Endpoint | 설명 | 요청 | 응답 |
-|---|---|---|---|---|
-|  |  |  |  |  |
+클라이언트와 서버 간의 파일 업로드, 조회 및 계정 관리를 위한 HTTP 요청 기반 API
+
+- **기본 Content-Type:** `application/json` (파일 업로드 시 `multipart/form-data`)
+
+| **Method** | **Endpoint** | **설명** | **요청** | **응답** |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/guest-logout` | 게스트 계정 및 연관 데이터 전체 삭제 | **[Body]**
+`userId` (String, 필수) | **[200 OK]**
+`{ "deleted": true }`
+**[500 Error]**
+`{ "error": "Guest logout cleanup failed." }` |
+| `POST` | `/api/profile-image` | Firebase Storage 이미지 업로드 및 DB 갱신 | **[Form-Data]**
+`userId` (String, 필수)
+`profileImage` (File, 필수) | **[200 OK]**
+`{ "profileImage": "/api/..." }`
+**[400 Error]**
+`{ "error": "Missing userId" }` |
+| `GET` | `/api/profile-image-file` | 보안을 위해 서버를 거쳐 이미지를 프록시 로드 | **[Query]**
+`path` (String, 필수) | **[200 OK]**
+이미지 바이너리 스트림
+**[404 Error]**
+Profile image not found. |
+
+### 2. Socket.IO 이벤트 명세서
+
+실시간 멀티플레이 상태 동기화 및 게임 진행을 위한 소켓 통신 규약
+
+#### Client ➔ Server (요청)
+
+클라이언트가 서버로 발생시키는 이벤트(`socket.emit`)
+
+응답은 비동기로 다른 이벤트를 통해 수신
+
+| **Method** | **Endpoint (이벤트)** | **설명** | **요청 (Payload)** | **응답 (기대 수신 이벤트)** |
+| --- | --- | --- | --- | --- |
+| `EMIT` | `request_room_list` | 메인 로비에 표시할 대기 중인 방 목록 요청 | (없음) | `room_list` |
+| `EMIT` | `validate_join_room` | 방 입장 전 비밀번호 및 정원 검사 | `{ roomCode, privateCode }` | 방 참가 검증 결과 |
+| `EMIT` | `create_room` | 조건에 맞춰 새 게임 방을 생성 (호스트 자동 입장) | `{ roomName, joinCode, level, maxPlayers, userId, nickname, point, profileImage }` | `room_update` |
+| `EMIT` | `join_room` | 선택한 코드로 기존 방에 참가 | `{ roomCode, privateCode, userId, nickname, point, profileImage }` | `room_update` |
+| `EMIT` | `leave_room` | 현재 참여 중인 게임 방에서 퇴장 | `{ roomCode }` | `room_update` |
+| `EMIT` | `toggle_ready` | 대기실 본인의 게임 준비(Ready) 상태 토글 | `{ roomCode }` | `room_update` |
+| `EMIT` | `start_game` | 모든 인원이 준비되었을 때 게임 시작 (방장) | `{ roomCode, level }` | `round_start`, `turn_start` |
+| `EMIT` | `submit_guess` | 본인의 턴에 예측한 평균 색상(RGB) 제출 | `{ roomCode, guessRGB: {r, g, b} }` | `my_guess_result` |
+
+#### Server ➔ Client (수신)
+
+서버에서 클라이언트로 전달되는 이벤트(`socket.on`)
+
+| **Method** | **Endpoint (이벤트)** | **설명** | **요청 (서버 발신 Payload)** | **응답** |
+| --- | --- | --- | --- | --- |
+| `ON` | `room_list` | 대기 중인 전체 방 목록 동기화 정보 수신 | `{ rooms: [방 정보 배열] }` | (없음) |
+| `ON` | `room_update` | 특정 방의 상태 변화 및 접속자 리스트 갱신 수신 | `{ roomCode, roomName, isPrivate, level, maxPlayers, phase, players, hostUserId }` | (없음) |
+| `ON` | `game_error` | 서버에서 발생한 예외/에러 메시지 수신 | `{ message: "에러 사유" }` | (없음) |
+| `ON` | `round_start` | 새 라운드 시작 알림 및 타겟 목표 색상 정보 수신 | `{ round, totalRounds, colors, players }` | (없음) |
+| `ON` | `turn_start` | 특정 플레이어의 예측 턴 시작 알림 및 남은 시간 수신 | `{ round, turnUserId, turnNickname, turnIndex, timeLimit, players }` | (없음) |
+| `ON` | `my_guess_result` | 본인이 제출한 색상에 대한 오차 및 피드백 결과 수신 | `{ guessRGB, feedback, errors }` | (없음) |
+| `ON` | `game_over` | 지정된 모든 라운드 종료, 정답 색상 및 최종 순위 수신 | `{ targetRgb, results: [최종 점수/순위 배열] }` | (없음) |
 
 ---
 
@@ -111,7 +165,7 @@
 > 접속 가능한 링크, 실행 방법, 주요 구현 내용
 
 - **서비스 URL:**  
-  https://color-master.madcamp-kaist.org/
+  https://color-master.madcamp-kaist.org
 
   HTTP로 접속하는 경우 HTTPS로 자동 리다이렉트됩니다.
 
