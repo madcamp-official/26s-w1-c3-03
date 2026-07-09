@@ -3357,11 +3357,14 @@ function handleTurnStart(data) {
   game.currentPlayerIndex = game.players.findIndex((player) => player.id === data.turnUserId);
   if (game.currentPlayerIndex < 0) game.currentPlayerIndex = 0;
 
-  // New turn means previous submission/choice/input state should be cleared.
+  /*
+    New turn means previous submission/choice state should be cleared.
+    Keep lastVisibleGuess so the local player can still see the previous RGB
+    numbers they entered during the game.
+  */
   game.currentSubmission = null;
   game.turnSubmitted = false;
   game.selectedChoice = null;
-  game.lastVisibleGuess = { r: "", g: "", b: "" };
   game.responseMarks = new Set();
   els.statusLine.textContent = isLocalTurn() ? "" : `${activePlayer().name} is guessing.`;
   render();
