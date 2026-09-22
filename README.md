@@ -1,5 +1,9 @@
 # 26s-w1-c3-03
 
+## Demo Video
+
+[Watch the Color Master demo](https://youtu.be/YcpZ_zAi6pg)
+
 ## 공통과제 I : 웹 기반 프로젝트 (2인 1팀)
 
 **목적:** 공통 과제를 함께 수행하며 웹 개발의 전체 흐름을 빠르게 익히고 협업에 적응하기
